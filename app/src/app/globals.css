@@ -1,0 +1,40 @@
+:root {
+  --background: #f8f9fa;
+  --foreground: #1a1a2e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0f0f13;
+    --foreground: #e8e8ed;
+  }
+}
+
+html,
+body {
+  max-width: 100vw;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  display: flex;
+  flex-direction: column;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+}
