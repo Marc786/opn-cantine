@@ -1,6 +1,6 @@
 {
-  "rootDirectory": "app",
-  "framework": "nextjs",
-  "installCommand": "pnpm install",
-  "buildCommand": "pnpm build"
+    "rootDirectory": "app",
+    "framework": "nextjs",
+    "installCommand": "pnpm install",
+    "buildCommand": "pnpm build"
 }
