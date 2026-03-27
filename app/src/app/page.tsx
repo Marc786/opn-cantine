@@ -11,46 +11,59 @@ import {
 } from '@chakra-ui/react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+
+const RAPID_INPUT_THRESHOLD_MS = 80;
+const AUTO_SUBMIT_DELAY_MS = 300;
+const MIN_LENGTH = 4;
 
 export default function Home() {
   const [employeeNumber, setEmployeeNumber] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const lastKeystrokeRef = useRef(0);
+  const rapidCountRef = useRef(0);
+  const autoSubmitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const submittingRef = useRef(false);
 
-  const handleSubmit = async () => {
-    if (!employeeNumber.trim()) {
+  const handleSubmit = useCallback(async (number?: string) => {
+    const value = (number ?? employeeNumber).trim();
+    if (submittingRef.current) return;
+
+    if (!value) {
       setError('Veuillez entrer un numéro.');
       return;
     }
 
-    if (employeeNumber.trim().length < 4) {
+    if (value.length < MIN_LENGTH) {
       setError('Le numéro doit contenir au moins 4 caractères.');
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     setError('');
 
     try {
       const res = await fetch(
-        `/api/employees/lookup?employeeNumber=${encodeURIComponent(employeeNumber.trim())}`
+        `/api/employees/lookup?employeeNumber=${encodeURIComponent(value)}`
       );
       const data = await res.json();
 
       if (data.found) {
-        router.push(`/tab/${encodeURIComponent(employeeNumber.trim())}`);
+        router.push(`/tab/${encodeURIComponent(value)}`);
       } else {
         router.push(
-          `/register?employeeNumber=${encodeURIComponent(employeeNumber.trim())}`
+          `/register?employeeNumber=${encodeURIComponent(value)}`
         );
       }
     } catch {
       setError('Erreur de connexion. Réessayez.');
       setLoading(false);
+      submittingRef.current = false;
     }
-  };
+  }, [employeeNumber, router]);
 
   return (
     <Flex
@@ -91,8 +104,31 @@ export default function Home() {
             const val = e.target.value.replace(/\D/g, '');
             setEmployeeNumber(val);
             setError('');
+
+            const now = Date.now();
+            if (now - lastKeystrokeRef.current < RAPID_INPUT_THRESHOLD_MS) {
+              rapidCountRef.current++;
+            } else {
+              rapidCountRef.current = 1;
+            }
+            lastKeystrokeRef.current = now;
+
+            if (autoSubmitTimerRef.current) {
+              clearTimeout(autoSubmitTimerRef.current);
+            }
+
+            if (rapidCountRef.current >= 3 && val.length >= MIN_LENGTH) {
+              autoSubmitTimerRef.current = setTimeout(() => {
+                handleSubmit(val);
+              }, AUTO_SUBMIT_DELAY_MS);
+            }
           }}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+              handleSubmit();
+            }
+          }}
           textAlign="center"
           fontSize={{ base: '3xl', md: '5xl' }}
           fontWeight="600"
@@ -113,7 +149,7 @@ export default function Home() {
           h="auto"
           py={6}
           colorPalette="gray"
-          onClick={handleSubmit}
+          onClick={() => handleSubmit()}
           loading={loading}
           fontWeight="600"
           fontSize={{ base: 'xl', md: '2xl' }}
