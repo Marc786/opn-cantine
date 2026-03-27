@@ -11,7 +11,7 @@ import {
 } from '@chakra-ui/react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const RAPID_INPUT_THRESHOLD_MS = 80;
 const AUTO_SUBMIT_DELAY_MS = 300;
@@ -49,6 +49,14 @@ export default function Home() {
       const res = await fetch(
         `/api/employees/lookup?employeeNumber=${encodeURIComponent(value)}`
       );
+
+      if (!res.ok) {
+        setError('Erreur du serveur. Réessayez.');
+        setLoading(false);
+        submittingRef.current = false;
+        return;
+      }
+
       const data = await res.json();
 
       if (data.found) {
@@ -64,6 +72,12 @@ export default function Home() {
       submittingRef.current = false;
     }
   }, [employeeNumber, router]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+    };
+  }, []);
 
   return (
     <Flex

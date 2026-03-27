@@ -45,7 +45,17 @@ export default function AdminPage() {
   const fetchEmployees = async () => {
     setLoading(true);
     const res = await fetch('/api/employees/all');
+    if (!res.ok) {
+      setAuthenticated(false);
+      setLoading(false);
+      return;
+    }
     const data = await res.json();
+    if (!Array.isArray(data)) {
+      setAuthenticated(false);
+      setLoading(false);
+      return;
+    }
     data.sort((a: Employee, b: Employee) => b.tab - a.tab);
     setEmployees(data);
     setLoading(false);

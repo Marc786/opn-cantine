@@ -32,7 +32,6 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Cantine" />
         <link rel="apple-touch-icon" href="/bell.png" />
         <meta name="theme-color" content="#ffffff" />
-        <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');` }} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
         <Providers>{children}</Providers>

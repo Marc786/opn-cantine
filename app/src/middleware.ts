@@ -3,7 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 const AUTH_COOKIE = "auth_token";
 
 async function generateToken(): Promise<string> {
-  const secret = (process.env.BASIC_AUTH_USER ?? "") + (process.env.BASIC_AUTH_PASSWORD ?? "");
+  const user = process.env.BASIC_AUTH_USER;
+  const password = process.env.BASIC_AUTH_PASSWORD;
+
+  if (!user || !password) {
+    throw new Error("BASIC_AUTH_USER and BASIC_AUTH_PASSWORD must be set");
+  }
+
+  const secret = `${user}:${password}`;
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -32,21 +39,25 @@ export async function middleware(request: NextRequest) {
   if (authHeader) {
     const [scheme, encoded] = authHeader.split(" ");
     if (scheme === "Basic" && encoded) {
-      const decoded = atob(encoded);
-      const [user, password] = decoded.split(":");
-      if (
-        user === process.env.BASIC_AUTH_USER &&
-        password === process.env.BASIC_AUTH_PASSWORD
-      ) {
-        const response = NextResponse.next();
-        response.cookies.set(AUTH_COOKIE, await generateToken(), {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "strict",
-          path: "/",
-          maxAge: 60 * 60 * 24 * 365 * 10, // 10 years
-        });
-        return response;
+      try {
+        const decoded = atob(encoded);
+        const [user, password] = decoded.split(":");
+        if (
+          user === process.env.BASIC_AUTH_USER &&
+          password === process.env.BASIC_AUTH_PASSWORD
+        ) {
+          const response = NextResponse.next();
+          response.cookies.set(AUTH_COOKIE, await generateToken(), {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            path: "/",
+            maxAge: 60 * 60 * 24, // 1 day
+          });
+          return response;
+        }
+      } catch {
+        // Malformed Base64; fall through to 401
       }
     }
   }

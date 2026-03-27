@@ -1,11 +1,19 @@
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
 const COOKIE_NAME = "admin_token";
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const MAX_CLOCK_SKEW_MS = 60 * 1000; // 1 minute
 
 function getSecret(): string {
-  return (process.env.ADMIN_PIN ?? "") + (process.env.BASIC_AUTH_PASSWORD ?? "");
+  const pin = process.env.ADMIN_PIN;
+  const password = process.env.BASIC_AUTH_PASSWORD;
+
+  if (!pin || !password) {
+    throw new Error("ADMIN_PIN and BASIC_AUTH_PASSWORD must be set");
+  }
+
+  return `${pin}:${password}`;
 }
 
 function sign(timestamp: number): string {
@@ -23,8 +31,15 @@ function isValidToken(token: string): boolean {
   const [tsStr, sig] = token.split(".");
   const ts = Number(tsStr);
   if (!ts || !sig) return false;
-  if (Date.now() - ts > TOKEN_TTL_MS) return false;
-  return sig === sign(ts);
+
+  const now = Date.now();
+  if (ts > now + MAX_CLOCK_SKEW_MS) return false;
+  if (now - ts > TOKEN_TTL_MS) return false;
+
+  const expected = sign(ts);
+  if (sig.length !== expected.length) return false;
+
+  return timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
 }
 
 export function setAdminCookie(response: NextResponse, token: string) {

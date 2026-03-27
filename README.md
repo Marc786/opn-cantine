@@ -2,7 +2,7 @@
 
 ## Tech stack
 
-- Next.js 16 (App Router)
+- Next.js 15 (App Router)
 - Chakra UI v3
 - MongoDB (native driver)
 - TypeScript
@@ -14,9 +14,9 @@ Create a `.env.local` file in `app/`:
 ```
 MONGODB_URI=mongodb://localhost:27017
 MONGODB_DB=cantine
-BASIC_AUTH_USER=admin
-BASIC_AUTH_PASSWORD=admin
-ADMIN_PIN=1234
+BASIC_AUTH_USER=<your-username>
+BASIC_AUTH_PASSWORD=<your-strong-password>
+ADMIN_PIN=<your-pin>
 ```
 
 ## Getting started
