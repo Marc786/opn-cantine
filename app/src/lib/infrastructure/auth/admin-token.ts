@@ -5,7 +5,7 @@ const COOKIE_NAME = "admin_token";
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 function getSecret(): string {
-  return process.env.ADMIN_PIN + process.env.BASIC_AUTH_PASSWORD;
+  return (process.env.ADMIN_PIN ?? "") + (process.env.BASIC_AUTH_PASSWORD ?? "");
 }
 
 function sign(timestamp: number): string {

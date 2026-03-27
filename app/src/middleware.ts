@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const AUTH_COOKIE = "auth_token";
 
 async function generateToken(): Promise<string> {
-  const secret = process.env.BASIC_AUTH_USER + process.env.BASIC_AUTH_PASSWORD;
+  const secret = (process.env.BASIC_AUTH_USER ?? "") + (process.env.BASIC_AUTH_PASSWORD ?? "");
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
