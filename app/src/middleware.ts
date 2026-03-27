@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 const AUTH_COOKIE = "auth_token";
 
+let cachedToken: string | null = null;
+
 async function generateToken(): Promise<string> {
+  if (cachedToken) return cachedToken;
+
   const user = process.env.BASIC_AUTH_USER;
   const password = process.env.BASIC_AUTH_PASSWORD;
 
@@ -24,12 +28,17 @@ async function generateToken(): Promise<string> {
     key,
     encoder.encode("authenticated")
   );
-  return Array.from(new Uint8Array(signature))
+  cachedToken = Array.from(new Uint8Array(signature))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+  return cachedToken;
 }
 
 export async function middleware(request: NextRequest) {
+  if (!process.env.BASIC_AUTH_USER || !process.env.BASIC_AUTH_PASSWORD) {
+    return NextResponse.next();
+  }
+
   const cookie = request.cookies.get(AUTH_COOKIE);
   if (cookie && cookie.value === (await generateToken())) {
     return NextResponse.next();
@@ -69,5 +78,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.json|bell.png).*)",
+  ],
 };

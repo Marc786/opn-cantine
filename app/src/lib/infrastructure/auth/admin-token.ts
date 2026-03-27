@@ -37,9 +37,14 @@ function isValidToken(token: string): boolean {
   if (now - ts > TOKEN_TTL_MS) return false;
 
   const expected = sign(ts);
-  if (sig.length !== expected.length) return false;
+  if (sig.length % 2 !== 0) return false;
+  if (!/^[0-9a-f]+$/i.test(sig)) return false;
 
-  return timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+  const sigBuf = Buffer.from(sig, "hex");
+  const expectedBuf = Buffer.from(expected, "hex");
+  if (sigBuf.length !== expectedBuf.length) return false;
+
+  return timingSafeEqual(sigBuf, expectedBuf);
 }
 
 export function setAdminCookie(response: NextResponse, token: string) {

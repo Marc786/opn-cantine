@@ -40,6 +40,9 @@ export default function AdminPage() {
 
   useEffect(() => {
     setMounted(true);
+    fetch('/api/admin/check').then((res) => {
+      if (res.ok) setAuthenticated(true);
+    });
   }, []);
 
   const fetchEmployees = async () => {
@@ -84,13 +87,19 @@ export default function AdminPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
 
-    await fetch('/api/employees/delete', {
+    const res = await fetch('/api/employees/delete', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ employeeNumber: deleteTarget.employeeNumber }),
     });
 
     setDeleteTarget(null);
+
+    if (!res.ok) {
+      setAuthenticated(false);
+      return;
+    }
+
     fetchEmployees();
   };
 

@@ -8,6 +8,9 @@ services:
     environment:
       - MONGODB_URI=mongodb://mongo:27017
       - MONGODB_DB=cantine
+      - BASIC_AUTH_USER=admin
+      - BASIC_AUTH_PASSWORD=changeme
+      - ADMIN_PIN=1234
     depends_on:
       mongo:
         condition: service_healthy
