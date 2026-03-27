@@ -157,8 +157,8 @@ export default function TabPage({
   };
 
   const getBalanceColor = (value: number) => {
-    const clamped = Math.max(0, Math.min(value, 100));
-    const ratio = clamped / 100;
+    const clamped = Math.max(0, Math.min(value, 80));
+    const ratio = clamped / 80;
 
     // green (34,197,94) → yellow (234,179,8) → red (239,68,68)
     let r: number, g: number, b: number;
@@ -219,11 +219,11 @@ export default function TabPage({
         </Flex>
 
         {/* Main content */}
-        <Flex flex={1} direction="column" justify="center" gap={8} py={6}>
+        <Flex flex={1} direction="column" justify="center" gap={6} py={4}>
           {/* Balance */}
           <Box
             w="full"
-            py={12}
+            py={8}
             borderRadius="2xl"
             bg={balanceColor.bg}
             textAlign="center"
@@ -245,15 +245,25 @@ export default function TabPage({
               {projectedTab.toFixed(2)}$
             </Text>
 
-            {hasPending && (
+            <Text
+              fontSize={{ base: 'md', md: 'lg' }}
+              fontWeight="600"
+              mt={4}
+              color={pendingColor.fg}
+              visibility={hasPending ? 'visible' : 'hidden'}
+            >
+              {pendingTotal > 0 ? '+' : ''}
+              {pendingTotal.toFixed(2)}$ depuis {employee.tab.toFixed(2)}$
+            </Text>
+
+            {projectedTab > 75 && (
               <Text
-                fontSize={{ base: 'md', md: 'lg' }}
+                fontSize={{ base: 'sm', md: 'md' }}
                 fontWeight="600"
                 mt={4}
-                color={pendingColor.fg}
+                color="red.500"
               >
-                {pendingTotal > 0 ? '+' : ''}
-                {pendingTotal.toFixed(2)}$ depuis {employee.tab.toFixed(2)}$
+                Votre solde dépasse 75$. Merci de payer votre dette.
               </Text>
             )}
           </Box>

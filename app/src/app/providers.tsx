@@ -5,7 +5,7 @@ import { ChakraProvider, defaultSystem, Theme } from '@chakra-ui/react';
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ChakraProvider value={defaultSystem}>
-      <Theme>{children}</Theme>
+      <Theme appearance="light">{children}</Theme>
     </ChakraProvider>
   );
 }

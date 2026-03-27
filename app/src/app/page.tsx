@@ -85,8 +85,11 @@ export default function Home() {
           placeholder="Ex: 12345"
           value={employeeNumber}
           minLength={4}
+          inputMode="numeric"
+          pattern="[0-9]*"
           onChange={e => {
-            setEmployeeNumber(e.target.value);
+            const val = e.target.value.replace(/\D/g, '');
+            setEmployeeNumber(val);
             setError('');
           }}
           onKeyDown={e => e.key === 'Enter' && handleSubmit()}

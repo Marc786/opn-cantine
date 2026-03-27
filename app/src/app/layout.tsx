@@ -24,8 +24,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Cantine" />
+        <link rel="apple-touch-icon" href="/bell.png" />
+        <meta name="theme-color" content="#ffffff" />
+        <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');` }} />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

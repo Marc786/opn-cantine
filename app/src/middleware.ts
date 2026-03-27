@@ -1,0 +1,62 @@
+import { NextRequest, NextResponse } from "next/server";
+
+const AUTH_COOKIE = "auth_token";
+
+async function generateToken(): Promise<string> {
+  const secret = process.env.BASIC_AUTH_USER + process.env.BASIC_AUTH_PASSWORD;
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode("authenticated")
+  );
+  return Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export async function middleware(request: NextRequest) {
+  const cookie = request.cookies.get(AUTH_COOKIE);
+  if (cookie && cookie.value === (await generateToken())) {
+    return NextResponse.next();
+  }
+
+  const authHeader = request.headers.get("authorization");
+  if (authHeader) {
+    const [scheme, encoded] = authHeader.split(" ");
+    if (scheme === "Basic" && encoded) {
+      const decoded = atob(encoded);
+      const [user, password] = decoded.split(":");
+      if (
+        user === process.env.BASIC_AUTH_USER &&
+        password === process.env.BASIC_AUTH_PASSWORD
+      ) {
+        const response = NextResponse.next();
+        response.cookies.set(AUTH_COOKIE, await generateToken(), {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "strict",
+          path: "/",
+          maxAge: 60 * 60 * 24 * 365 * 10, // 10 years
+        });
+        return response;
+      }
+    }
+  }
+
+  return new NextResponse("Unauthorized", {
+    status: 401,
+    headers: { "WWW-Authenticate": 'Basic realm="Secure Area"' },
+  });
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};

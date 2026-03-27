@@ -1,148 +1,73 @@
-# Bell Canteen - Self-Service Kiosk
+# Cantine
 
-A web-based self-service kiosk application for the Bell office canteen. Employees can purchase items (drinks, snacks, etc.) by entering their name and the purchase amount.
+## Tech stack
 
-## Project Overview
+- Next.js 16 (App Router)
+- Chakra UI v3
+- MongoDB (native driver)
+- TypeScript
 
-This application consists of:
+## Environment variables
 
-- **Frontend**: Next.js app optimized for iPad/tablet display
-- **Backend**: NestJS REST API for processing purchases
-- **MVP Features**: Simple purchase entry with name and amount
-
-## Tech Stack
-
-- **Frontend**: Next.js 14, React, TypeScript
-- **Backend**: NestJS, TypeScript
-- **Database**: MongoDB
-
-## Project Structure
+Create a `.env.local` file in `app/`:
 
 ```
-OPN/
-├── backend/          # NestJS backend API
-│   ├── src/
-│   │   ├── app.module.ts
-│   │   ├── main.ts
-│   │   └── purchases/
-│   └── package.json
-├── frontend/         # Next.js frontend app
-│   ├── src/
-│   │   ├── app/
-│   │   └── components/
-│   └── package.json
-└── README.md
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DB=cantine
+BASIC_AUTH_USER=admin
+BASIC_AUTH_PASSWORD=admin
+ADMIN_PIN=1234
 ```
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ and npm/yarn
-- Git
-
-### Backend Setup
+## Getting started
 
 ```bash
-cd backend
-npm install
-npm run start:dev
+cd app
+pnpm install
+pnpm dev
 ```
 
-The backend will run on `http://localhost:3000`
-
-### Frontend Setup
+## Docker
 
 ```bash
-cd frontend
-npm install
-npm run dev
+docker compose up --build
 ```
 
-The frontend will run on `http://localhost:3001`
-
-## MVP Features
-
-### About the MVP
-
-The MVP (Minimum Viable Product) is designed to be a streamlined proof-of-concept for the Bell canteen self-service system. It focuses on the core functionality: allowing employees to quickly record their purchases at the kiosk. The interface is intentionally simple—employees enter their name and the dollar amount of their purchase, then submit. This data is sent to the backend API where it's stored with a timestamp. The goal is to validate the user flow and technical architecture before adding complexity like product catalogs, payment processing, or user authentication. Think of it as a digital honor system that lays the foundation for a full-featured canteen management system.
-
-### Current Features (v0.1)
-
-- ✅ Simple purchase form with name and amount inputs
-- ✅ Submit purchases to backend API
-- ✅ Basic validation
-- ✅ iPad-optimized UI
-
-### Planned Features
-
-- [ ] Product catalog with prices
-- [ ] User authentication/employee ID
-- [ ] Purchase history
-- [ ] Admin dashboard
-- [ ] Payment integration
-- [ ] Receipt generation
-- [ ] Inventory management
-- [ ] Analytics and reporting
-
-## API Endpoints
-
-### POST /purchases
-
-Create a new purchase
-
-**Request Body:**
-
-```json
-{
-  "name": "John Doe",
-  "amount": 5.5
-}
-```
-
-**Response:**
-
-```json
-{
-  "id": "uuid",
-  "name": "John Doe",
-  "amount": 5.5,
-  "timestamp": "2026-02-05T12:00:00.000Z"
-}
-```
-
-### GET /purchases
-
-Get all purchases (for admin/testing)
-
-## Development
-
-### Running Tests
+App runs on `http://localhost:3000` with MongoDB on `localhost:27017`.
 
 ```bash
-# Backend
-cd backend
-npm run test
-
-# Frontend
-cd frontend
-npm run test
+docker compose down
 ```
 
-### Building for Production
+## Project structure
 
-```bash
-# Backend
-cd backend
-npm run build
-npm run start:prod
-
-# Frontend
-cd frontend
-npm run build
-npm run start
 ```
-
-## License
-
-Proprietary - Bell Internal Use Only
+src/
+├── app/
+│   ├── page.tsx                        # Employee login
+│   ├── register/page.tsx               # New employee registration
+│   ├── admin/page.tsx                  # Admin dashboard (PIN protected)
+│   ├── tab/[employeeNumber]/page.tsx   # Employee tab view
+│   └── api/
+│       ├── health/route.ts             # Health check
+│       ├── admin/
+│       │   ├── verify-pin/route.ts     # POST - verify admin PIN
+│       │   └── check/route.ts          # GET  - check admin session
+│       └── employees/
+│           ├── route.ts                # POST   - create employee
+│           ├── lookup/route.ts         # GET    - lookup by number
+│           ├── all/route.ts            # GET    - list all (admin)
+│           ├── tab/route.ts            # POST/DELETE - add to tab / reset
+│           └── delete/route.ts         # DELETE - remove employee (admin)
+├── middleware.ts                        # Basic auth + session cookie
+└── lib/
+    ├── domain/
+    │   ├── entities/                    # Employee entity
+    │   └── ports/                       # Repository interface
+    ├── application/
+    │   └── services/                    # Employee application service
+    └── infrastructure/
+        ├── auth/                        # Admin token utilities
+        ├── db/                          # MongoDB connection
+        └── repositories/                # MongoDB repository
+```

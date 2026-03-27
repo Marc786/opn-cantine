@@ -9,6 +9,7 @@ import {
   HStack,
   Heading,
   IconButton,
+  Input,
   Text,
   VStack,
   DialogRoot,
@@ -29,9 +30,17 @@ interface Employee {
 
 export default function AdminPage() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -43,8 +52,24 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    fetchEmployees();
-  }, []);
+    if (authenticated) fetchEmployees();
+  }, [authenticated]);
+
+  const handlePin = async () => {
+    setPinError('');
+    const res = await fetch('/api/admin/verify-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+    const data = await res.json();
+    if (data.valid) {
+      setAuthenticated(true);
+    } else {
+      setPinError('NIP invalide.');
+      setPin('');
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -58,6 +83,74 @@ export default function AdminPage() {
     setDeleteTarget(null);
     fetchEmployees();
   };
+
+  if (!mounted) {
+    return <Flex minH="100dvh" />;
+  }
+
+  if (!authenticated) {
+    return (
+      <Flex minH="100dvh" align="center" justify="center" px={8} direction="column" gap={6}>
+        <IconButton
+          aria-label="Retour"
+          variant="outline"
+          size="lg"
+          color="fg.muted"
+          fontSize="xl"
+          position="absolute"
+          top={6}
+          right={6}
+          onClick={() => router.push('/')}
+        >
+          ✕
+        </IconButton>
+
+        <Heading size={{ base: '2xl', md: '4xl' }} fontWeight="800" letterSpacing="-0.02em">
+          Administration
+        </Heading>
+        <Text color="fg.muted" fontSize={{ base: 'lg', md: 'xl' }}>
+          Entrez le NIP
+        </Text>
+
+        <VStack gap={4} w="full" maxW="400px">
+          <Input
+            type="password"
+            inputMode="numeric"
+            placeholder="NIP"
+            value={pin}
+            onChange={(e) => {
+              setPin(e.target.value);
+              setPinError('');
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && handlePin()}
+            textAlign="center"
+            fontSize={{ base: '3xl', md: '5xl' }}
+            fontWeight="600"
+            letterSpacing="0.2em"
+            py={10}
+            h="auto"
+            autoFocus
+          />
+          {pinError && (
+            <Text color="red.500" fontSize="lg">
+              {pinError}
+            </Text>
+          )}
+          <Button
+            w="full"
+            h="auto"
+            py={6}
+            colorPalette="gray"
+            onClick={handlePin}
+            fontWeight="600"
+            fontSize={{ base: 'xl', md: '2xl' }}
+          >
+            Continuer
+          </Button>
+        </VStack>
+      </Flex>
+    );
+  }
 
   return (
     <>
