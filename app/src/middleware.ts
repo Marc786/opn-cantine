@@ -50,7 +50,10 @@ export async function middleware(request: NextRequest) {
     if (scheme === "Basic" && encoded) {
       try {
         const decoded = atob(encoded);
-        const [user, password] = decoded.split(":");
+        const colonIndex = decoded.indexOf(":");
+        if (colonIndex === -1) throw new Error("invalid");
+        const user = decoded.slice(0, colonIndex);
+        const password = decoded.slice(colonIndex + 1);
         if (
           user === process.env.BASIC_AUTH_USER &&
           password === process.env.BASIC_AUTH_PASSWORD

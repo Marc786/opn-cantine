@@ -52,8 +52,6 @@ export default function Home() {
 
       if (!res.ok) {
         setError('Erreur du serveur. Réessayez.');
-        setLoading(false);
-        submittingRef.current = false;
         return;
       }
 
@@ -68,6 +66,7 @@ export default function Home() {
       }
     } catch {
       setError('Erreur de connexion. Réessayez.');
+    } finally {
       setLoading(false);
       submittingRef.current = false;
     }
