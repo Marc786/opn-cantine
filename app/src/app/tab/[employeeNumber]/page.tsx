@@ -209,9 +209,6 @@ export default function TabPage({
             >
               {employee.fullName}
             </Heading>
-            <Text color="fg.muted" fontSize={{ base: 'md', md: 'lg' }}>
-              #{employee.employeeNumber}
-            </Text>
           </VStack>
           <IconButton
             aria-label="Fermer"

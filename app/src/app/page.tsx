@@ -26,6 +26,18 @@ export default function Home() {
   const rapidCountRef = useRef(0);
   const autoSubmitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submittingRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keep the hidden input focused at all times
+  useEffect(() => {
+    const refocus = () => inputRef.current?.focus();
+    document.addEventListener('click', refocus);
+    document.addEventListener('touchstart', refocus);
+    return () => {
+      document.removeEventListener('click', refocus);
+      document.removeEventListener('touchstart', refocus);
+    };
+  }, []);
 
   const handleSubmit = useCallback(async (number?: string) => {
     const value = (number ?? employeeNumber).trim();
@@ -102,74 +114,64 @@ export default function Home() {
           Cantine
         </Heading>
         <Text color="fg.muted" fontSize={{ base: 'lg', md: 'xl' }}>
-          Entrez votre numéro d&apos;employé
+          Scannez votre carte
         </Text>
       </VStack>
 
-      <VStack gap={8} w="full" maxW="600px">
-        <Input
-          placeholder="Ex: 12345"
-          value={employeeNumber}
-          minLength={4}
-          inputMode="numeric"
-          pattern="[0-9]*"
-          onChange={e => {
-            const val = e.target.value.replace(/\D/g, '');
-            setEmployeeNumber(val);
-            setError('');
+      {/* Hidden input to capture card reader scan */}
+      <Input
+        ref={inputRef}
+        value={employeeNumber}
+        onBlur={() => inputRef.current?.focus()}
+        onChange={e => {
+          const val = e.target.value.replace(/\D/g, '');
+          setEmployeeNumber(val);
+          setError('');
 
-            const now = Date.now();
-            if (now - lastKeystrokeRef.current < RAPID_INPUT_THRESHOLD_MS) {
-              rapidCountRef.current++;
-            } else {
-              rapidCountRef.current = 1;
-            }
-            lastKeystrokeRef.current = now;
+          const now = Date.now();
+          if (now - lastKeystrokeRef.current < RAPID_INPUT_THRESHOLD_MS) {
+            rapidCountRef.current++;
+          } else {
+            rapidCountRef.current = 1;
+          }
+          lastKeystrokeRef.current = now;
 
-            if (autoSubmitTimerRef.current) {
-              clearTimeout(autoSubmitTimerRef.current);
-            }
+          if (autoSubmitTimerRef.current) {
+            clearTimeout(autoSubmitTimerRef.current);
+          }
 
-            if (rapidCountRef.current >= 3 && val.length >= MIN_LENGTH) {
-              autoSubmitTimerRef.current = setTimeout(() => {
-                handleSubmit(val);
-              }, AUTO_SUBMIT_DELAY_MS);
-            }
-          }}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
-              handleSubmit();
-            }
-          }}
-          textAlign="center"
-          fontSize={{ base: '3xl', md: '5xl' }}
-          fontWeight="600"
-          letterSpacing="0.1em"
-          py={10}
-          h="auto"
-          autoFocus
-        />
+          if (rapidCountRef.current >= 3 && val.length >= MIN_LENGTH) {
+            autoSubmitTimerRef.current = setTimeout(() => {
+              handleSubmit(val);
+            }, AUTO_SUBMIT_DELAY_MS);
+          }
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
+            handleSubmit();
+          }
+        }}
+        position="absolute"
+        opacity={0}
+        h={0}
+        w={0}
+        overflow="hidden"
+        inputMode="none"
+        autoFocus
+      />
 
-        {error && (
-          <Text color="red.500" fontSize="lg">
-            {error}
-          </Text>
-        )}
+      {error && (
+        <Text color="red.500" fontSize="lg">
+          {error}
+        </Text>
+      )}
 
-        <Button
-          w="full"
-          h="auto"
-          py={6}
-          colorPalette="gray"
-          onClick={() => handleSubmit()}
-          loading={loading}
-          fontWeight="600"
-          fontSize={{ base: 'xl', md: '2xl' }}
-        >
-          Continuer
-        </Button>
-      </VStack>
+      {loading && (
+        <Text color="fg.muted" fontSize="lg">
+          Chargement...
+        </Text>
+      )}
 
       <Button
         variant="ghost"
