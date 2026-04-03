@@ -32,6 +32,17 @@ interface Employee {
   tab: number;
 }
 
+interface ScannedProduct {
+  barcode: string;
+  name: string;
+  price: number;
+  qty: number;
+}
+
+const RAPID_INPUT_THRESHOLD_MS = 80;
+const AUTO_SUBMIT_DELAY_MS = 300;
+const MIN_BARCODE_LENGTH = 4;
+
 export default function TabPage({
   params,
 }: {
@@ -43,6 +54,15 @@ export default function TabPage({
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [pendingTotal, setPendingTotal] = useState(0);
+
+  // Barcode scanner state
+  const [scannedProducts, setScannedProducts] = useState<ScannedProduct[]>([]);
+  const [scanFeedback, setScanFeedback] = useState('');
+  const scanInputRef = useRef<HTMLInputElement>(null);
+  const [scanValue, setScanValue] = useState('');
+  const lastScanKeystrokeRef = useRef(0);
+  const rapidScanCountRef = useRef(0);
+  const autoScanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Modal state
   const [resetOpen, setResetOpen] = useState(false);
@@ -67,6 +87,61 @@ export default function TabPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employeeNumber]);
 
+  // Handle product barcode scan
+  const handleProductScan = useCallback(
+    async (barcode: string) => {
+      const value = barcode.trim();
+      if (!value || value.length < MIN_BARCODE_LENGTH) return;
+
+      try {
+        const res = await fetch(
+          `/api/products/lookup?barcode=${encodeURIComponent(value)}`
+        );
+        const data = await res.json();
+
+        if (!data.found) {
+          setScanFeedback('Produit inconnu');
+          setTimeout(() => setScanFeedback(''), 3000);
+          return;
+        }
+
+        const product = data.product;
+
+        if (product.quantity <= 0) {
+          setScanFeedback(`${product.name} — Rupture de stock`);
+          setTimeout(() => setScanFeedback(''), 3000);
+          return;
+        }
+
+        // Add to pending total
+        setPendingTotal((prev) => prev + product.price);
+
+        // Track scanned product for stock decrement at save time
+        setScannedProducts((prev) => {
+          const existing = prev.find((p) => p.barcode === value);
+          if (existing) {
+            return prev.map((p) =>
+              p.barcode === value ? { ...p, qty: p.qty + 1 } : p
+            );
+          }
+          return [
+            ...prev,
+            { barcode: value, name: product.name, price: product.price, qty: 1 },
+          ];
+        });
+
+        setScanFeedback(`${product.name} — ${product.price.toFixed(2)}$`);
+        setTimeout(() => setScanFeedback(''), 3000);
+      } catch {
+        setScanFeedback('Erreur de connexion');
+        setTimeout(() => setScanFeedback(''), 3000);
+      }
+
+      setScanValue('');
+    },
+    []
+  );
+
   const lastAddRef = useRef(0);
   const addPending = (value: number) => {
     if (!value) return;
@@ -87,11 +162,25 @@ export default function TabPage({
       body: JSON.stringify({ employeeNumber, amount: pendingTotal }),
     });
 
+    // Decrement product stock for scanned items
+    if (res.ok && scannedProducts.length > 0) {
+      await fetch('/api/products/decrement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: scannedProducts.map((p) => ({
+            barcode: p.barcode,
+            quantity: p.qty,
+          })),
+        }),
+      });
+    }
+
     if (res.ok) {
       router.push('/');
     }
     setLoading(false);
-  }, [employee, employeeNumber, pendingTotal, router]);
+  }, [employee, employeeNumber, pendingTotal, scannedProducts, router]);
 
   const startSaveCountdown = () => {
     setCountdown(5);
@@ -156,6 +245,7 @@ export default function TabPage({
       const data = await res.json();
       setEmployee(data);
       setPendingTotal(0);
+      setScannedProducts([]);
     }
     setLoading(false);
   };
@@ -186,6 +276,21 @@ export default function TabPage({
 
   // Custom amount modal state
   const [customOpen, setCustomOpen] = useState(false);
+
+  // Keep scanner input focused when no modal is open
+  useEffect(() => {
+    const refocus = () => {
+      if (!customOpen && !saveOpen && !resetOpen) {
+        scanInputRef.current?.focus();
+      }
+    };
+    document.addEventListener('click', refocus);
+    document.addEventListener('touchstart', refocus);
+    return () => {
+      document.removeEventListener('click', refocus);
+      document.removeEventListener('touchstart', refocus);
+    };
+  }, [customOpen, saveOpen, resetOpen]);
 
   const parsedAmount = parseFloat(amount);
   const hasValidAmount = !isNaN(parsedAmount) && parsedAmount > 0;
@@ -221,6 +326,92 @@ export default function TabPage({
             ✕
           </IconButton>
         </Flex>
+
+        {/* Hidden barcode scanner input */}
+        <Input
+          ref={scanInputRef}
+          value={scanValue}
+          onBlur={() => {
+            if (!customOpen && !saveOpen && !resetOpen) {
+              scanInputRef.current?.focus();
+            }
+          }}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            setScanValue(val);
+
+            const now = Date.now();
+            if (now - lastScanKeystrokeRef.current < RAPID_INPUT_THRESHOLD_MS) {
+              rapidScanCountRef.current++;
+            } else {
+              rapidScanCountRef.current = 1;
+            }
+            lastScanKeystrokeRef.current = now;
+
+            if (autoScanTimerRef.current) {
+              clearTimeout(autoScanTimerRef.current);
+            }
+
+            if (rapidScanCountRef.current >= 3 && val.length >= MIN_BARCODE_LENGTH) {
+              autoScanTimerRef.current = setTimeout(() => {
+                handleProductScan(val);
+              }, AUTO_SUBMIT_DELAY_MS);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (autoScanTimerRef.current) clearTimeout(autoScanTimerRef.current);
+              handleProductScan(scanValue);
+            }
+          }}
+          position="absolute"
+          opacity={0}
+          h={0}
+          w={0}
+          overflow="hidden"
+          inputMode="none"
+          autoFocus
+        />
+
+        {/* Scan feedback */}
+        {scanFeedback && (
+          <Box
+            mt={4}
+            py={3}
+            px={5}
+            borderRadius="xl"
+            bg="bg.subtle"
+            textAlign="center"
+          >
+            <Text fontSize={{ base: 'md', md: 'lg' }} fontWeight="600">
+              {scanFeedback}
+            </Text>
+          </Box>
+        )}
+
+        {/* Scanned products list */}
+        {scannedProducts.length > 0 && (
+          <VStack mt={4} gap={1} w="full">
+            {scannedProducts.map((p) => (
+              <Flex
+                key={p.barcode}
+                w="full"
+                py={2}
+                px={4}
+                justify="space-between"
+                borderRadius="md"
+                bg="bg.subtle"
+              >
+                <Text fontSize="sm" fontWeight="600">
+                  {p.name} {p.qty > 1 ? `x${p.qty}` : ''}
+                </Text>
+                <Text fontSize="sm" fontWeight="600">
+                  {(p.price * p.qty).toFixed(2)}$
+                </Text>
+              </Flex>
+            ))}
+          </VStack>
+        )}
 
         {/* Main content */}
         <Flex flex={1} direction="column" justify="center" gap={6} py={4}>
