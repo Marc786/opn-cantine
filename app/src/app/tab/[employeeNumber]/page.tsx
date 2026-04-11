@@ -67,8 +67,12 @@ export default function TabPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employeeNumber]);
 
+  const lastAddRef = useRef(0);
   const addPending = (value: number) => {
     if (!value) return;
+    const now = Date.now();
+    if (now - lastAddRef.current < 300) return;
+    lastAddRef.current = now;
     setPendingTotal((prev) => prev + value);
     setAmount('');
   };
@@ -157,8 +161,8 @@ export default function TabPage({
   };
 
   const getBalanceColor = (value: number) => {
-    const clamped = Math.max(0, Math.min(value, 100));
-    const ratio = clamped / 100;
+    const clamped = Math.max(0, Math.min(value, 80));
+    const ratio = clamped / 80;
 
     // green (34,197,94) → yellow (234,179,8) → red (239,68,68)
     let r: number, g: number, b: number;
@@ -179,6 +183,9 @@ export default function TabPage({
       fg: `rgb(${r}, ${g}, ${b})`,
     };
   };
+
+  // Custom amount modal state
+  const [customOpen, setCustomOpen] = useState(false);
 
   const parsedAmount = parseFloat(amount);
   const hasValidAmount = !isNaN(parsedAmount) && parsedAmount > 0;
@@ -202,9 +209,6 @@ export default function TabPage({
             >
               {employee.fullName}
             </Heading>
-            <Text color="fg.muted" fontSize={{ base: 'md', md: 'lg' }}>
-              #{employee.employeeNumber}
-            </Text>
           </VStack>
           <IconButton
             aria-label="Fermer"
@@ -219,11 +223,11 @@ export default function TabPage({
         </Flex>
 
         {/* Main content */}
-        <Flex flex={1} direction="column" justify="center" gap={8} py={6}>
+        <Flex flex={1} direction="column" justify="center" gap={6} py={4}>
           {/* Balance */}
           <Box
             w="full"
-            py={12}
+            py={8}
             borderRadius="2xl"
             bg={balanceColor.bg}
             textAlign="center"
@@ -245,20 +249,30 @@ export default function TabPage({
               {projectedTab.toFixed(2)}$
             </Text>
 
-            {hasPending && (
+            <Text
+              fontSize={{ base: 'md', md: 'lg' }}
+              fontWeight="600"
+              mt={4}
+              color={pendingColor.fg}
+              visibility={hasPending ? 'visible' : 'hidden'}
+            >
+              {pendingTotal > 0 ? '+' : ''}
+              {pendingTotal.toFixed(2)}$ depuis {employee.tab.toFixed(2)}$
+            </Text>
+
+            {projectedTab > 75 && (
               <Text
-                fontSize={{ base: 'md', md: 'lg' }}
+                fontSize={{ base: 'sm', md: 'md' }}
                 fontWeight="600"
                 mt={4}
-                color={pendingColor.fg}
+                color="red.500"
               >
-                {pendingTotal > 0 ? '+' : ''}
-                {pendingTotal.toFixed(2)}$ depuis {employee.tab.toFixed(2)}$
+                Votre solde dépasse 75$. Merci de payer votre dette.
               </Text>
             )}
           </Box>
 
-          {/* Quick shortcuts */}
+          {/* Quick-add buttons */}
           <HStack gap={3} w="full">
             <Button
               flex={1}
@@ -270,7 +284,7 @@ export default function TabPage({
               fontWeight="600"
               fontSize={{ base: 'lg', md: 'xl' }}
             >
-              0.50$
+              +0.50$
             </Button>
             <Button
               flex={1}
@@ -282,7 +296,7 @@ export default function TabPage({
               fontWeight="600"
               fontSize={{ base: 'lg', md: 'xl' }}
             >
-              1.00$
+              +1.00$
             </Button>
             <Button
               flex={1}
@@ -294,55 +308,24 @@ export default function TabPage({
               fontWeight="600"
               fontSize={{ base: 'lg', md: 'xl' }}
             >
-              2.00$
+              +2.00$
             </Button>
           </HStack>
 
-          {/* Custom amount */}
-          <HStack gap={3} w="full">
-            <Input
-              placeholder="0.00"
-              type="number"
-              step="0.01"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              fontSize={{ base: '2xl', md: '3xl' }}
-              fontWeight="600"
-              textAlign="center"
-              py={8}
-              h="auto"
-              flex={1}
-            />
-            <VStack gap={2}>
-              <Button
-                h="auto"
-                py={4}
-                px={8}
-                colorPalette="green"
-                onClick={() => addPending(parsedAmount)}
-                disabled={loading || !hasValidAmount}
-                fontWeight="600"
-                fontSize={{ base: 'lg', md: 'xl' }}
-                w="full"
-              >
-                Ajouter
-              </Button>
-              <Button
-                h="auto"
-                py={4}
-                px={8}
-                colorPalette="red"
-                onClick={() => addPending(-parsedAmount)}
-                disabled={loading || !hasValidAmount}
-                fontWeight="600"
-                fontSize={{ base: 'lg', md: 'xl' }}
-                w="full"
-              >
-                Soustraire
-              </Button>
-            </VStack>
-          </HStack>
+          {/* Custom amount button */}
+          <Button
+            w="full"
+            h="auto"
+            py={6}
+            variant="outline"
+            colorPalette="gray"
+            onClick={() => { setAmount(''); setCustomOpen(true); }}
+            disabled={loading}
+            fontWeight="600"
+            fontSize={{ base: 'lg', md: 'xl' }}
+          >
+            Autre montant
+          </Button>
 
           <Separator />
 
@@ -417,6 +400,71 @@ export default function TabPage({
                   onClick={handleConfirmReset}
                 >
                   Confirmer
+                </Button>
+              </HStack>
+            </DialogFooter>
+          </DialogContent>
+        </DialogPositioner>
+      </DialogRoot>
+
+      {/* Custom amount modal */}
+      <DialogRoot
+        open={customOpen}
+        onOpenChange={(e) => setCustomOpen(e.open)}
+        placement="center"
+        size="lg"
+      >
+        <DialogBackdrop />
+        <DialogPositioner>
+          <DialogContent p={8}>
+            <DialogHeader pb={4}>
+              <DialogTitle fontSize="2xl" fontWeight="700">
+                Autre montant
+              </DialogTitle>
+            </DialogHeader>
+            <DialogBody>
+              <Input
+                placeholder="0.00"
+                type="number"
+                step="0.01"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                fontSize={{ base: '2xl', md: '3xl' }}
+                fontWeight="600"
+                textAlign="center"
+                py={8}
+                h="auto"
+                autoFocus
+              />
+            </DialogBody>
+            <DialogFooter pt={6}>
+              <HStack gap={3} w="full">
+                <Button
+                  flex={1}
+                  colorPalette="red"
+                  size="lg"
+                  fontSize="lg"
+                  onClick={() => {
+                    if (hasValidAmount) addPending(-parsedAmount);
+                    setCustomOpen(false);
+                  }}
+                  disabled={!hasValidAmount}
+                >
+                  Soustraire
+                </Button>
+                <Button
+                  flex={1}
+                  colorPalette="green"
+                  size="lg"
+                  fontSize="lg"
+                  onClick={() => {
+                    if (hasValidAmount) addPending(parsedAmount);
+                    setCustomOpen(false);
+                  }}
+                  disabled={!hasValidAmount}
+                >
+                  Ajouter
                 </Button>
               </HStack>
             </DialogFooter>

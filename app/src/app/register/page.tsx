@@ -17,12 +17,12 @@ function RegisterForm() {
 
   const handleSubmit = async () => {
     if (!employeeNumber.trim()) {
-      setError("Le numéro d'employé est requis.");
+      setError("Le numéro de carte est requis.");
       return;
     }
 
     if (employeeNumber.trim().length < 4) {
-      setError("Le numéro d'employé doit contenir au moins 4 caractères.");
+      setError("Le numéro de carte doit contenir au moins 4 caractères.");
       return;
     }
 
@@ -89,7 +89,7 @@ function RegisterForm() {
             fontWeight="500"
             color="fg.muted"
           >
-            Numéro d&apos;employé
+            Numéro de carte
           </Text>
           <Input
             placeholder="Ex: 12345"

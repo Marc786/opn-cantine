@@ -15,7 +15,7 @@ export class EmployeeEntity implements Employee {
 
   private validate(): void {
     if (!this.employeeNumber || this.employeeNumber.trim().length === 0) {
-      throw new Error('Employee number is required');
+      throw new Error('Card number is required');
     }
 
     if (!this.fullName || this.fullName.trim().length === 0) {
