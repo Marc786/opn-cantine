@@ -195,6 +195,21 @@ export default function AdminPage() {
           </IconButton>
         </Flex>
 
+        {/* Products link */}
+        <Button
+          mt={8}
+          w="full"
+          h="auto"
+          py={6}
+          variant="outline"
+          colorPalette="gray"
+          onClick={() => router.push('/admin/products')}
+          fontWeight="600"
+          fontSize={{ base: 'lg', md: 'xl' }}
+        >
+          Gestion des produits
+        </Button>
+
         {/* Total */}
         {!loading && employees.length > 0 && (
           <Flex
