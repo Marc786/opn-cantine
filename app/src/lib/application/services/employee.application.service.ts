@@ -8,6 +8,10 @@ export class EmployeeApplicationService {
     return this.employeeRepository.findByEmployeeNumber(employeeNumber);
   }
 
+  async search(query: string) {
+    return this.employeeRepository.searchByName(query);
+  }
+
   async create(employeeNumber: string, fullName: string) {
     const existing =
       await this.employeeRepository.findByEmployeeNumber(employeeNumber);

@@ -32,9 +32,11 @@ export default function AdminPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
 
@@ -42,6 +44,9 @@ export default function AdminPage() {
     setMounted(true);
     fetch('/api/admin/check').then((res) => {
       if (res.ok) setAuthenticated(true);
+      setCheckingAuth(false);
+    }).catch(() => {
+      setCheckingAuth(false);
     });
   }, []);
 
@@ -59,8 +64,18 @@ export default function AdminPage() {
       setLoading(false);
       return;
     }
-    data.sort((a: Employee, b: Employee) => b.tab - a.tab);
+    data.sort((a: Employee, b: Employee) => {
+      if (b.tab !== a.tab) return b.tab - a.tab;
+      return a.fullName.localeCompare(b.fullName);
+    });
     setEmployees(data);
+
+    const transRes = await fetch('/api/transactions');
+    if (transRes.ok) {
+      const transData = await transRes.json();
+      setTransactions(Array.isArray(transData) ? transData : []);
+    }
+
     setLoading(false);
   };
 
@@ -103,7 +118,7 @@ export default function AdminPage() {
     fetchEmployees();
   };
 
-  if (!mounted) {
+  if (!mounted || checkingAuth) {
     return <Flex minH="100dvh" />;
   }
 
@@ -231,6 +246,33 @@ export default function AdminPage() {
               {employees.reduce((sum, e) => sum + e.tab, 0).toFixed(2)}$
             </Text>
           </Flex>
+        )}
+
+        {/* Recent Transactions */}
+        {!loading && transactions.length > 0 && (
+          <Box w="full" mt={8}>
+            <Heading size="lg" mb={4} fontWeight="700">Transactions récentes</Heading>
+            <VStack gap={3} w="full" align="stretch">
+              {transactions.slice(0, 5).map((t) => (
+                <Flex key={t.id} p={4} borderRadius="md" bg="bg.subtle" justify="space-between" align="center">
+                  <VStack align="start" gap={0}>
+                    <Text fontWeight="600">
+                      {employees.find((e) => e.employeeNumber === t.employeeNumber)?.fullName || t.employeeNumber}
+                    </Text>
+                    <Text fontSize="sm" color="fg.muted">
+                      {new Date(t.timestamp).toLocaleString('fr-CA', { dateStyle: 'short', timeStyle: 'short' })}
+                    </Text>
+                  </VStack>
+                  <VStack align="end" gap={0}>
+                    <Text fontWeight="700">+{t.totalAmount.toFixed(2)}$</Text>
+                    <Text fontSize="xs" color="fg.muted" textAlign="right">
+                      {t.items.map((i: any) => `${i.name} (x${i.quantity})`).join(', ')}
+                    </Text>
+                  </VStack>
+                </Flex>
+              ))}
+            </VStack>
+          </Box>
         )}
 
         {/* Table */}

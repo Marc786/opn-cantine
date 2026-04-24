@@ -15,6 +15,11 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
     return col.findOne({ employeeNumber });
   }
 
+  async searchByName(query: string): Promise<Employee[]> {
+    const col = await this.collection();
+    return col.find({ fullName: { $regex: query, $options: 'i' } }).toArray();
+  }
+
   async save(employee: Employee): Promise<Employee> {
     const col = await this.collection();
     await col.insertOne({ ...employee });
