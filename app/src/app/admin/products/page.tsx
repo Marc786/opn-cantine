@@ -39,6 +39,7 @@ export default function AdminProductsPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
@@ -78,6 +79,9 @@ export default function AdminProductsPage() {
     setMounted(true);
     fetch('/api/admin/check').then((res) => {
       if (res.ok) setAuthenticated(true);
+      setCheckingAuth(false);
+    }).catch(() => {
+      setCheckingAuth(false);
     });
   }, []);
 
@@ -95,7 +99,10 @@ export default function AdminProductsPage() {
       setLoading(false);
       return;
     }
-    data.sort((a: Product, b: Product) => a.name.localeCompare(b.name));
+    data.sort((a: Product, b: Product) => {
+      if (a.quantity !== b.quantity) return a.quantity - b.quantity;
+      return a.name.localeCompare(b.name);
+    });
     setProducts(data);
     setQuantityEdits({});
     setPriceEdits({});
@@ -279,7 +286,7 @@ export default function AdminProductsPage() {
       )
     : products;
 
-  if (!mounted) {
+  if (!mounted || checkingAuth) {
     return <Flex minH="100dvh" />;
   }
 

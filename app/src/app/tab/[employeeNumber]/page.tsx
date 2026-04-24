@@ -51,7 +51,6 @@ export default function TabPage({
   const { employeeNumber } = use(params);
   const router = useRouter();
   const [employee, setEmployee] = useState<Employee | null>(null);
-  const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [pendingTotal, setPendingTotal] = useState(0);
 
@@ -67,6 +66,7 @@ export default function TabPage({
   // Modal state
   const [resetOpen, setResetOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [unknownOpen, setUnknownOpen] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -100,8 +100,7 @@ export default function TabPage({
         const data = await res.json();
 
         if (!data.found) {
-          setScanFeedback('Produit inconnu');
-          setTimeout(() => setScanFeedback(''), 3000);
+          setUnknownOpen(true);
           return;
         }
 
@@ -143,13 +142,25 @@ export default function TabPage({
   );
 
   const lastAddRef = useRef(0);
-  const addPending = (value: number) => {
-    if (!value) return;
+  const addCoffee = () => {
     const now = Date.now();
     if (now - lastAddRef.current < 300) return;
     lastAddRef.current = now;
-    setPendingTotal((prev) => prev + value);
-    setAmount('');
+
+    setPendingTotal((prev) => prev + 1);
+
+    setScannedProducts((prev) => {
+      const existing = prev.find((p) => p.barcode === '_cafe_');
+      if (existing) {
+        return prev.map((p) =>
+          p.barcode === '_cafe_' ? { ...p, qty: p.qty + 1 } : p
+        );
+      }
+      return [
+        ...prev,
+        { barcode: '_cafe_', name: 'Café', price: 1.00, qty: 1 },
+      ];
+    });
   };
 
   const doSave = useCallback(async () => {
@@ -174,6 +185,22 @@ export default function TabPage({
           })),
         }),
       });
+
+      // Log the transaction
+      await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeNumber,
+          totalAmount: pendingTotal,
+          items: scannedProducts.map((p) => ({
+            barcode: p.barcode,
+            name: p.name,
+            price: p.price,
+            quantity: p.qty,
+          })),
+        }),
+      }).catch(console.error); // Fire and forget so we don't block UI if it fails
     }
 
     if (res.ok) {
@@ -274,13 +301,10 @@ export default function TabPage({
     };
   };
 
-  // Custom amount modal state
-  const [customOpen, setCustomOpen] = useState(false);
-
   // Keep scanner input focused when no modal is open
   useEffect(() => {
     const refocus = () => {
-      if (!customOpen && !saveOpen && !resetOpen) {
+      if (!saveOpen && !resetOpen && !unknownOpen) {
         scanInputRef.current?.focus();
       }
     };
@@ -290,10 +314,8 @@ export default function TabPage({
       document.removeEventListener('click', refocus);
       document.removeEventListener('touchstart', refocus);
     };
-  }, [customOpen, saveOpen, resetOpen]);
+  }, [saveOpen, resetOpen, unknownOpen]);
 
-  const parsedAmount = parseFloat(amount);
-  const hasValidAmount = !isNaN(parsedAmount) && parsedAmount > 0;
   const hasPending = pendingTotal !== 0;
   const projectedTab = employee ? employee.tab + pendingTotal : 0;
   const balanceColor = getBalanceColor(projectedTab);
@@ -332,7 +354,7 @@ export default function TabPage({
           ref={scanInputRef}
           value={scanValue}
           onBlur={() => {
-            if (!customOpen && !saveOpen && !resetOpen) {
+            if (!saveOpen && !resetOpen && !unknownOpen) {
               scanInputRef.current?.focus();
             }
           }}
@@ -373,25 +395,49 @@ export default function TabPage({
           autoFocus
         />
 
-        {/* Scan feedback */}
-        {scanFeedback && (
+        {/* Fixed height container for scan feedback and products list to prevent UI shifting */}
+        <Box minH="120px" w="full" position="relative" zIndex={10}>
+          {/* Scan feedback */}
           <Box
-            mt={4}
+            position="absolute"
+            top={0}
+            left={0}
+            right={0}
             py={3}
             px={5}
             borderRadius="xl"
             bg="bg.subtle"
             textAlign="center"
+            opacity={scanFeedback ? 1 : 0}
+            visibility={scanFeedback ? 'visible' : 'hidden'}
+            transition="all 0.2s"
+            zIndex={2}
           >
             <Text fontSize={{ base: 'md', md: 'lg' }} fontWeight="600">
-              {scanFeedback}
+              {scanFeedback || ' '}
             </Text>
           </Box>
-        )}
 
-        {/* Scanned products list */}
-        {scannedProducts.length > 0 && (
-          <VStack mt={4} gap={1} w="full">
+          {/* Scanned products list */}
+          <VStack 
+            w="full" 
+            maxH="120px" 
+            overflowY="auto" 
+            gap={1}
+            opacity={scannedProducts.length > 0 && !scanFeedback ? 1 : 0}
+            visibility={scannedProducts.length > 0 && !scanFeedback ? 'visible' : 'hidden'}
+            transition="all 0.2s"
+            position="absolute"
+            top={0}
+            left={0}
+            right={0}
+            zIndex={1}
+            css={{
+              '&::-webkit-scrollbar': { width: '4px' },
+              '&::-webkit-scrollbar-track': { background: 'transparent' },
+              '&::-webkit-scrollbar-thumb': { background: 'var(--chakra-colors-border)', borderRadius: '4px' },
+            }}
+          >
             {scannedProducts.map((p) => (
               <Flex
                 key={p.barcode}
@@ -411,7 +457,7 @@ export default function TabPage({
               </Flex>
             ))}
           </VStack>
-        )}
+        </Box>
 
         {/* Main content */}
         <Flex flex={1} direction="column" justify="center" gap={6} py={4}>
@@ -470,53 +516,14 @@ export default function TabPage({
               h="auto"
               py={6}
               colorPalette="gray" variant="outline"
-              onClick={() => addPending(0.5)}
+              onClick={addCoffee}
               disabled={loading}
               fontWeight="600"
               fontSize={{ base: 'lg', md: 'xl' }}
             >
-              +0.50$
-            </Button>
-            <Button
-              flex={1}
-              h="auto"
-              py={6}
-              colorPalette="gray" variant="outline"
-              onClick={() => addPending(1)}
-              disabled={loading}
-              fontWeight="600"
-              fontSize={{ base: 'lg', md: 'xl' }}
-            >
-              +1.00$
-            </Button>
-            <Button
-              flex={1}
-              h="auto"
-              py={6}
-              colorPalette="gray" variant="outline"
-              onClick={() => addPending(2)}
-              disabled={loading}
-              fontWeight="600"
-              fontSize={{ base: 'lg', md: 'xl' }}
-            >
-              +2.00$
+              Café (+1.00$)
             </Button>
           </HStack>
-
-          {/* Custom amount button */}
-          <Button
-            w="full"
-            h="auto"
-            py={6}
-            variant="outline"
-            colorPalette="gray"
-            onClick={() => { setAmount(''); setCustomOpen(true); }}
-            disabled={loading}
-            fontWeight="600"
-            fontSize={{ base: 'lg', md: 'xl' }}
-          >
-            Autre montant
-          </Button>
 
           <Separator />
 
@@ -591,71 +598,6 @@ export default function TabPage({
                   onClick={handleConfirmReset}
                 >
                   Confirmer
-                </Button>
-              </HStack>
-            </DialogFooter>
-          </DialogContent>
-        </DialogPositioner>
-      </DialogRoot>
-
-      {/* Custom amount modal */}
-      <DialogRoot
-        open={customOpen}
-        onOpenChange={(e) => setCustomOpen(e.open)}
-        placement="center"
-        size="lg"
-      >
-        <DialogBackdrop />
-        <DialogPositioner>
-          <DialogContent p={8}>
-            <DialogHeader pb={4}>
-              <DialogTitle fontSize="2xl" fontWeight="700">
-                Autre montant
-              </DialogTitle>
-            </DialogHeader>
-            <DialogBody>
-              <Input
-                placeholder="0.00"
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                fontSize={{ base: '2xl', md: '3xl' }}
-                fontWeight="600"
-                textAlign="center"
-                py={8}
-                h="auto"
-                autoFocus
-              />
-            </DialogBody>
-            <DialogFooter pt={6}>
-              <HStack gap={3} w="full">
-                <Button
-                  flex={1}
-                  colorPalette="red"
-                  size="lg"
-                  fontSize="lg"
-                  onClick={() => {
-                    if (hasValidAmount) addPending(-parsedAmount);
-                    setCustomOpen(false);
-                  }}
-                  disabled={!hasValidAmount}
-                >
-                  Soustraire
-                </Button>
-                <Button
-                  flex={1}
-                  colorPalette="green"
-                  size="lg"
-                  fontSize="lg"
-                  onClick={() => {
-                    if (hasValidAmount) addPending(parsedAmount);
-                    setCustomOpen(false);
-                  }}
-                  disabled={!hasValidAmount}
-                >
-                  Ajouter
                 </Button>
               </HStack>
             </DialogFooter>
@@ -743,6 +685,42 @@ export default function TabPage({
                   Sauvegarder
                 </Button>
               </HStack>
+            </DialogFooter>
+          </DialogContent>
+        </DialogPositioner>
+      </DialogRoot>
+
+      {/* Unknown product modal */}
+      <DialogRoot
+        open={unknownOpen}
+        onOpenChange={(e) => setUnknownOpen(e.open)}
+        placement="center"
+        size="md"
+      >
+        <DialogBackdrop />
+        <DialogPositioner>
+          <DialogContent p={8} textAlign="center">
+            <DialogHeader pb={4}>
+              <DialogTitle fontSize="2xl" fontWeight="700" color="red.500">
+                Produit inconnu
+              </DialogTitle>
+            </DialogHeader>
+            <DialogBody>
+              <Text fontSize="lg" fontWeight="500">
+                Ce produit n&apos;est pas reconnu.
+              </Text>
+              <Text mt={4} fontSize="md" color="fg.muted">
+                Veuillez voir un administrateur OPN pour ajouter ce produit au système de la cantine.
+              </Text>
+            </DialogBody>
+            <DialogFooter pt={6} justifyContent="center">
+              <Button
+                size="lg"
+                colorPalette="gray"
+                onClick={() => setUnknownOpen(false)}
+              >
+                Compris
+              </Button>
             </DialogFooter>
           </DialogContent>
         </DialogPositioner>
