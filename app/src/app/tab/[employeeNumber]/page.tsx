@@ -51,7 +51,6 @@ export default function TabPage({
   const { employeeNumber } = use(params);
   const router = useRouter();
   const [employee, setEmployee] = useState<Employee | null>(null);
-  const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [pendingTotal, setPendingTotal] = useState(0);
 
@@ -302,13 +301,10 @@ export default function TabPage({
     };
   };
 
-  // Custom amount modal state
-  const [customOpen, setCustomOpen] = useState(false);
-
   // Keep scanner input focused when no modal is open
   useEffect(() => {
     const refocus = () => {
-      if (!customOpen && !saveOpen && !resetOpen && !unknownOpen) {
+      if (!saveOpen && !resetOpen && !unknownOpen) {
         scanInputRef.current?.focus();
       }
     };
@@ -318,10 +314,8 @@ export default function TabPage({
       document.removeEventListener('click', refocus);
       document.removeEventListener('touchstart', refocus);
     };
-  }, [customOpen, saveOpen, resetOpen, unknownOpen]);
+  }, [saveOpen, resetOpen, unknownOpen]);
 
-  const parsedAmount = parseFloat(amount);
-  const hasValidAmount = !isNaN(parsedAmount) && parsedAmount > 0;
   const hasPending = pendingTotal !== 0;
   const projectedTab = employee ? employee.tab + pendingTotal : 0;
   const balanceColor = getBalanceColor(projectedTab);
@@ -360,7 +354,7 @@ export default function TabPage({
           ref={scanInputRef}
           value={scanValue}
           onBlur={() => {
-            if (!customOpen && !saveOpen && !resetOpen) {
+            if (!saveOpen && !resetOpen && !unknownOpen) {
               scanInputRef.current?.focus();
             }
           }}
@@ -611,71 +605,6 @@ export default function TabPage({
         </DialogPositioner>
       </DialogRoot>
 
-      {/* Custom amount modal */}
-      <DialogRoot
-        open={customOpen}
-        onOpenChange={(e) => setCustomOpen(e.open)}
-        placement="center"
-        size="lg"
-      >
-        <DialogBackdrop />
-        <DialogPositioner>
-          <DialogContent p={8}>
-            <DialogHeader pb={4}>
-              <DialogTitle fontSize="2xl" fontWeight="700">
-                Autre montant
-              </DialogTitle>
-            </DialogHeader>
-            <DialogBody>
-              <Input
-                placeholder="0.00"
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                fontSize={{ base: '2xl', md: '3xl' }}
-                fontWeight="600"
-                textAlign="center"
-                py={8}
-                h="auto"
-                autoFocus
-              />
-            </DialogBody>
-            <DialogFooter pt={6}>
-              <HStack gap={3} w="full">
-                <Button
-                  flex={1}
-                  colorPalette="red"
-                  size="lg"
-                  fontSize="lg"
-                  onClick={() => {
-                    if (hasValidAmount) addPending(-parsedAmount);
-                    setCustomOpen(false);
-                  }}
-                  disabled={!hasValidAmount}
-                >
-                  Soustraire
-                </Button>
-                <Button
-                  flex={1}
-                  colorPalette="green"
-                  size="lg"
-                  fontSize="lg"
-                  onClick={() => {
-                    if (hasValidAmount) addPending(parsedAmount);
-                    setCustomOpen(false);
-                  }}
-                  disabled={!hasValidAmount}
-                >
-                  Ajouter
-                </Button>
-              </HStack>
-            </DialogFooter>
-          </DialogContent>
-        </DialogPositioner>
-      </DialogRoot>
-
       {/* Save confirmation modal with countdown */}
       <DialogRoot
         open={saveOpen}
@@ -778,7 +707,7 @@ export default function TabPage({
             </DialogHeader>
             <DialogBody>
               <Text fontSize="lg" fontWeight="500">
-                Ce produit n'est pas reconnu.
+                Ce produit n&apos;est pas reconnu.
               </Text>
               <Text mt={4} fontSize="md" color="fg.muted">
                 Veuillez voir un administrateur OPN pour ajouter ce produit au système de la cantine.

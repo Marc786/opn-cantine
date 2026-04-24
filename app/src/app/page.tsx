@@ -218,7 +218,7 @@ export default function Home() {
             size="lg"
             onClick={() => setIsSearchMode(true)}
           >
-            J'ai oublié ma carte
+            J&apos;ai oublié ma carte
           </Button>
         </>
       ) : (

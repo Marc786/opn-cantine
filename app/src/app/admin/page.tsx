@@ -28,6 +28,14 @@ interface Employee {
   tab: number;
 }
 
+interface AdminTransaction {
+  id: string;
+  employeeNumber: string;
+  timestamp: string | Date;
+  totalAmount: number;
+  items: { name: string; quantity: number }[];
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -36,7 +44,7 @@ export default function AdminPage() {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
 
@@ -266,7 +274,7 @@ export default function AdminPage() {
                   <VStack align="end" gap={0}>
                     <Text fontWeight="700">+{t.totalAmount.toFixed(2)}$</Text>
                     <Text fontSize="xs" color="fg.muted" textAlign="right">
-                      {t.items.map((i: any) => `${i.name} (x${i.quantity})`).join(', ')}
+                      {t.items.map((i) => `${i.name} (x${i.quantity})`).join(', ')}
                     </Text>
                   </VStack>
                 </Flex>

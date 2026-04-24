@@ -11,9 +11,9 @@ export async function GET(request: NextRequest) {
   try {
     const transactions = await service.getAll();
     return NextResponse.json(transactions.slice(0, 50));
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error' },
+      { error: error instanceof Error ? error.message : 'Internal Server Error' },
       { status: 500 }
     );
   }
@@ -40,9 +40,9 @@ export async function POST(request: NextRequest) {
     const result = await service.logTransaction(employeeNumber, items, totalAmount);
 
     return NextResponse.json({ success: true, transaction: result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error' },
+      { error: error instanceof Error ? error.message : 'Internal Server Error' },
       { status: 500 }
     );
   }
