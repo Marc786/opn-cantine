@@ -12,10 +12,10 @@ import {
   HStack,
   Flex,
   Separator,
-  IconButton,
 } from '@chakra-ui/react';
 import { useCart } from './hooks/useCart';
 import { useSaveFlow } from './hooks/useSaveFlow';
+import { HistoryModal } from './components/HistoryModal';
 import { SaveModal } from './components/SaveModal';
 import { ResetModal } from './components/ResetModal';
 import { EditProductModal } from './components/EditProductModal';
@@ -81,6 +81,7 @@ export default function TabPage({
   const [unknownOpen, setUnknownOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<ScannedProduct | null>(null);
   const [editQty, setEditQty] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const cart = useCart(setUnknownOpen);
 
@@ -141,13 +142,13 @@ export default function TabPage({
   // Keep scanner input focused when no modal is open
   useEffect(() => {
     const refocus = () => {
-      if (!save.saveOpen && !resetOpen && !unknownOpen && !editProduct) {
+      if (!save.saveOpen && !resetOpen && !unknownOpen && !editProduct && !historyOpen) {
         cart.scanInputRef.current?.focus();
       }
     };
     document.addEventListener('click', refocus);
     return () => document.removeEventListener('click', refocus);
-  }, [save.saveOpen, resetOpen, unknownOpen, editProduct, cart.scanInputRef]);
+  }, [save.saveOpen, resetOpen, unknownOpen, editProduct, historyOpen, cart.scanInputRef]);
 
   const hasPending = cart.pendingTotal !== 0;
   const projectedTab = employee ? employee.tab + cart.pendingTotal : 0;
@@ -170,16 +171,16 @@ export default function TabPage({
               {employee.employeeNumber}
             </Heading>
           </VStack>
-          <IconButton
-            aria-label="Fermer"
+          <Button
+            aria-label="Voir historique"
             variant="outline"
-            size="lg"
+            size="md"
             color="fg.muted"
-            fontSize="xl"
-            onClick={() => router.push('/')}
+            fontWeight="600"
+            onClick={() => setHistoryOpen(true)}
           >
-            ✕
-          </IconButton>
+            Voir historique
+          </Button>
         </Flex>
 
         {/* Hidden barcode scanner input */}
@@ -477,6 +478,12 @@ export default function TabPage({
           );
           setEditProduct(null);
         }}
+      />
+
+      <HistoryModal
+        open={historyOpen}
+        cardNumber={cardNumber}
+        onClose={() => setHistoryOpen(false)}
       />
     </>
   );

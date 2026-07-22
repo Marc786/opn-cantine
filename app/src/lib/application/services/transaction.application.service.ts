@@ -12,4 +12,8 @@ export class TransactionApplicationService {
   async getAll() {
     return this.transactionRepository.findAll();
   }
+
+  async getByCardNumber(cardNumber: string) {
+    return this.transactionRepository.findByCardNumber(cardNumber);
+  }
 }
