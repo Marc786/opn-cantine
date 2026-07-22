@@ -95,6 +95,7 @@ export default function TabPage({
     resetOpen,
     unknownOpen,
     editProduct,
+    historyOpen,
   });
 
   useEffect(() => {
