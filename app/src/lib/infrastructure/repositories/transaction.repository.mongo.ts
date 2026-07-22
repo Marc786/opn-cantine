@@ -20,6 +20,11 @@ export class MongoTransactionRepository implements ITransactionRepository {
     const col = await this.collection();
     return col.find().sort({ timestamp: -1 }).toArray();
   }
+
+  async findByCardNumber(cardNumber: string): Promise<Transaction[]> {
+    const col = await this.collection();
+    return col.find({ cardNumber }).sort({ timestamp: -1 }).limit(20).toArray();
+  }
 }
 
 export const transactionRepository = new MongoTransactionRepository();
