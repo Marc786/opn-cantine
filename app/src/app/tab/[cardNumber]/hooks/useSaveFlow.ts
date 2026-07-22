@@ -14,6 +14,7 @@ interface Params {
   resetOpen: boolean;
   unknownOpen: boolean;
   editProduct: ScannedProduct | null;
+  historyOpen: boolean;
 }
 
 export function useSaveFlow({
@@ -26,6 +27,7 @@ export function useSaveFlow({
   resetOpen,
   unknownOpen,
   editProduct,
+  historyOpen,
 }: Params) {
   const [saveOpen, setSaveOpen] = useState(false);
   const [countdown, setCountdown] = useState(5);
@@ -132,7 +134,7 @@ export function useSaveFlow({
   useEffect(() => {
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
 
-    if (saveOpen || resetOpen || unknownOpen || editProduct) return;
+    if (saveOpen || resetOpen || unknownOpen || editProduct || historyOpen) return;
 
     inactivityTimerRef.current = setTimeout(() => {
       handleSaveRef.current();
@@ -144,7 +146,7 @@ export function useSaveFlow({
         inactivityTimerRef.current = null;
       }
     };
-  }, [scannedProducts, saveOpen, resetOpen, unknownOpen, editProduct]);
+  }, [scannedProducts, saveOpen, resetOpen, unknownOpen, editProduct, historyOpen]);
 
   return { saveOpen, countdown, handleSave, cancelSave, doSave };
 }
