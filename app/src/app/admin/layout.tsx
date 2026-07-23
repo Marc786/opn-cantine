@@ -19,6 +19,7 @@ const NAV_LINKS = [
   { href: '/admin/dashboard',      label: 'Tableau de bord' },
   { href: '/admin/restock',        label: 'Stocks' },
   { href: '/admin/announcements',  label: 'Annonces' },
+  { href: '/admin/config',         label: 'Config' },
 ];
 
 const NAV_H = '72px';

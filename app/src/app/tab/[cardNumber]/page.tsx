@@ -123,6 +123,7 @@ export default function TabPage({
       .catch(() => null);
   }, [cardNumber, router]);
 
+
   const handleConfirmReset = async () => {
     setResetOpen(false);
     setLoading(true);
@@ -160,7 +161,7 @@ export default function TabPage({
 
   return (
     <>
-      <Flex minH="100dvh" direction="column" px={8} py={6}>
+      <Flex minH="100dvh" direction="column" px={8} py={6} position="relative" zIndex={1}>
         {/* Top bar */}
         <Flex justify="space-between" align="center">
           <VStack align="start" gap={0}>

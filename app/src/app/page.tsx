@@ -224,6 +224,7 @@ export default function Home() {
       align="center"
       justify="center"
       position="relative"
+      zIndex={1}
       px={8}
       py={10}
       direction="column"
