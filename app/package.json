@@ -19,6 +19,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@internationalized/date": "^3.11.0",
+    "@tanstack/react-table": "^9.1.2",
     "framer-motion": "^12.33.0",
     "lucide-react": "^1.18.0",
     "mongodb": "^7.1.0",

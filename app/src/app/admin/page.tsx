@@ -27,17 +27,9 @@ interface Employee {
   tab: number;
 }
 
-interface AdminTransaction {
-  id: string;
-  cardNumber: string;
-  timestamp: string | Date;
-  totalAmount: number;
-  items: { name: string; quantity: number }[];
-}
 
 export default function AdminPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
   const [editTarget, setEditTarget] = useState<Employee | null>(null);
@@ -55,12 +47,6 @@ export default function AdminPage() {
       return a.employeeNumber.localeCompare(b.employeeNumber);
     });
     setEmployees(data);
-
-    const transRes = await fetch('/api/transactions');
-    if (transRes.ok) {
-      const transData = await transRes.json();
-      setTransactions(Array.isArray(transData) ? transData : []);
-    }
     setLoading(false);
   };
 
@@ -114,33 +100,6 @@ export default function AdminPage() {
               {employees.reduce((sum, e) => sum + e.tab, 0).toFixed(2)}$
             </Text>
           </Flex>
-        )}
-
-        {/* Recent Transactions */}
-        {!loading && transactions.length > 0 && (
-          <Box w="full" mt={8}>
-            <Heading size="lg" mb={4} fontWeight="700">Transactions récentes</Heading>
-            <VStack gap={3} w="full" align="stretch">
-              {transactions.slice(0, 5).map((t, i) => (
-                <Flex key={t.id ?? `${t.cardNumber}-${i}`} p={4} borderRadius="md" bg="bg.subtle" justify="space-between" align="center">
-                  <VStack align="start" gap={0}>
-                    <Text fontWeight="600">
-                      {employees.find((e) => e.cardNumber === t.cardNumber)?.employeeNumber || t.cardNumber}
-                    </Text>
-                    <Text fontSize="sm" color="fg.muted">
-                      {new Date(t.timestamp).toLocaleString('fr-CA', { dateStyle: 'short', timeStyle: 'short' })}
-                    </Text>
-                  </VStack>
-                  <VStack align="end" gap={0}>
-                    <Text fontWeight="700">+{t.totalAmount.toFixed(2)}$</Text>
-                    <Text fontSize="xs" color="fg.muted" textAlign="right">
-                      {t.items.map((i) => `${i.name} (x${i.quantity})`).join(', ')}
-                    </Text>
-                  </VStack>
-                </Flex>
-              ))}
-            </VStack>
-          </Box>
         )}
 
         {/* Table */}
