@@ -48,17 +48,6 @@ export function useSaveFlow({
     });
 
     if (res.ok && scannedProducts.length > 0) {
-      await fetch('/api/products/decrement', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: scannedProducts.map((p) => ({
-            barcode: p.barcode,
-            quantity: p.qty,
-          })),
-        }),
-      });
-
       await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

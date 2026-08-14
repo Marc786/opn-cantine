@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TransactionApplicationService } from '@/lib/application/services/transaction.application.service';
 import { transactionRepository } from '@/lib/infrastructure/repositories/transaction.repository.mongo';
+import { productRepository } from '@/lib/infrastructure/repositories/product.repository.mongo';
 import { verifyAdminRequest, unauthorizedResponse } from '@/lib/infrastructure/auth/admin-token';
 
 const service = new TransactionApplicationService(transactionRepository);
@@ -51,6 +52,19 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await service.logTransaction(cardNumber, items, totalAmount);
+
+    // Decrement inventory server-side, in the same request as the transaction log.
+    // Using Promise.allSettled so a failed decrement for one item doesn't block others.
+    await Promise.allSettled(
+      items
+        .filter((item) => item.barcode && !item.barcode.startsWith('_') && item.quantity > 0)
+        .map(async (item) => {
+          const product = await productRepository.findByBarcode(item.barcode);
+          if (product) {
+            await productRepository.decrementQuantity(product.id, item.quantity);
+          }
+        })
+    );
 
     return NextResponse.json({ success: true, transaction: result });
   } catch (error: unknown) {
