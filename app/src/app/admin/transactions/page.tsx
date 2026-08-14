@@ -28,6 +28,7 @@ import {
   rowSortingFeature,
   sortFn_datetime,
   sortFn_basic,
+  type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
 
@@ -196,11 +197,10 @@ export default function AdminTransactionsPage() {
     [result, employeeMap]
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const table = useTable({
     features: _features,
     data: rows,
-    columns: COLUMNS as any,
+    columns: COLUMNS as ColumnDef<typeof _features, TxRow>[],
     state: { sorting },
     onSortingChange: setSorting,
   });
