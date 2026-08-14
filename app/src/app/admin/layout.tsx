@@ -15,6 +15,7 @@ import {
 
 const NAV_LINKS = [
   { href: '/admin',                label: 'Employés' },
+  { href: '/admin/transactions',   label: 'Transactions' },
   { href: '/admin/products',       label: 'Produits' },
   { href: '/admin/dashboard',      label: 'Tableau de bord' },
   { href: '/admin/restock',        label: 'Stocks' },

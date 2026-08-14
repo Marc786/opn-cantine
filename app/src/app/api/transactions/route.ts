@@ -9,6 +9,21 @@ export async function GET(request: NextRequest) {
   if (!verifyAdminRequest(request)) return unauthorizedResponse();
 
   try {
+    const { searchParams } = new URL(request.url);
+    const pageParam = searchParams.get('page');
+
+    // Paginated mode
+    if (pageParam !== null) {
+      const page = Math.max(1, parseInt(pageParam) || 1);
+      const cardNumber = searchParams.get('cardNumber') ?? undefined;
+      const itemsParam = searchParams.get('items');
+      const items = itemsParam ? itemsParam.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+
+      const result = await service.getPaginated(page, cardNumber, items);
+      return NextResponse.json(result);
+    }
+
+    // Legacy mode (no pagination param) — keep backward compat
     const transactions = await service.getAll();
     return NextResponse.json(transactions.slice(0, 50));
   } catch (error: unknown) {
@@ -31,8 +46,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Since this endpoint is just for logging, we return successfully immediately if there are no items
-    // (e.g. if the user only added a custom amount in the past, though we removed that button, we still guard)
     if (items.length === 0) {
       return NextResponse.json({ success: true, message: 'No items to log' });
     }
