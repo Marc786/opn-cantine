@@ -31,6 +31,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
+import { CASH_CARD_NUMBER } from '@/lib/domain/constants';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -190,7 +191,7 @@ export default function AdminTransactionsPage() {
     (result?.data ?? []).map((tx, i) => ({
       id: tx.id ?? String(i),
       timestamp: tx.timestamp,
-      employeeNumber: employeeMap[tx.cardNumber] ?? tx.cardNumber,
+      employeeNumber: tx.cardNumber === CASH_CARD_NUMBER ? 'Comptant' : (employeeMap[tx.cardNumber] ?? tx.cardNumber),
       articles: tx.items.map((it) => `${it.name}${it.quantity > 1 ? ` ×${it.quantity}` : ''}`).join(', '),
       totalAmount: tx.totalAmount,
     })),
@@ -249,6 +250,7 @@ export default function AdminTransactionsPage() {
               }}
             >
               <option value="">Tous les employés</option>
+              <option value={CASH_CARD_NUMBER}>Comptant</option>
               {employees.map((e) => (
                 <option key={e.cardNumber} value={e.cardNumber}>
                   {e.employeeNumber}
