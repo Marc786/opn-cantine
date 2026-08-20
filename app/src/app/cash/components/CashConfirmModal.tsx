@@ -17,6 +17,7 @@ import {
   ProgressTrack,
   ProgressRange,
 } from '@chakra-ui/react';
+import { COUNTDOWN_SECONDS } from '../hooks/useCashSaveFlow';
 
 interface CashConfirmModalProps {
   open: boolean;
@@ -60,12 +61,12 @@ export function CashConfirmModal({
               </HStack>
 
               <Text fontSize="md" color="fg.muted" textAlign="center">
-                Confirmez que le montant a bien été reçu à la boîte.
+                Confirmez que le montant a bien été déposé dans la boite.
               </Text>
 
               <VStack gap={2} w="full">
                 <ProgressRoot
-                  value={(countdown / 5) * 100}
+                  value={(countdown / COUNTDOWN_SECONDS) * 100}
                   w="full"
                   size="lg"
                   colorPalette="gray"

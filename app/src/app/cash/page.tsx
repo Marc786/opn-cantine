@@ -11,6 +11,7 @@ import {
   Input,
   HStack,
   Flex,
+  Separator,
 } from '@chakra-ui/react';
 import { useCart } from '../tab/[cardNumber]/hooks/useCart';
 import { useCashSaveFlow } from './hooks/useCashSaveFlow';
@@ -57,24 +58,13 @@ export default function CashPage() {
     <>
       <Flex minH="100dvh" direction="column" px={8} py={6}>
         {/* Top bar */}
-        <Flex justify="space-between" align="center">
-          <Heading
-            size={{ base: '2xl', md: '4xl' }}
-            fontWeight="800"
-            letterSpacing="-0.02em"
-          >
-            Paiement comptant
-          </Heading>
-          <Button
-            variant="outline"
-            size="md"
-            color="fg.muted"
-            fontWeight="600"
-            onClick={() => router.push('/')}
-          >
-            Annuler
-          </Button>
-        </Flex>
+        <Heading
+          size={{ base: '2xl', md: '4xl' }}
+          fontWeight="800"
+          letterSpacing="-0.02em"
+        >
+          Paiement comptant
+        </Heading>
 
         {/* Hidden barcode scanner input */}
         <Input
@@ -96,8 +86,9 @@ export default function CashPage() {
           autoFocus
         />
 
-        {/* Fixed height container for scan feedback */}
-        <Box minH="60px" w="full" position="relative" zIndex={10}>
+        {/* Fixed height container for scan feedback and products list */}
+        <Box minH="120px" w="full" position="relative" zIndex={10}>
+          {/* Scan feedback */}
           <Box
             position="absolute"
             top={0}
@@ -111,22 +102,28 @@ export default function CashPage() {
             opacity={cart.scanFeedback ? 1 : 0}
             visibility={cart.scanFeedback ? 'visible' : 'hidden'}
             transition="all 0.2s"
+            zIndex={2}
           >
             <Text fontSize={{ base: 'md', md: 'lg' }} fontWeight="600">
               {cart.scanFeedback || ' '}
             </Text>
           </Box>
-        </Box>
 
-        {/* Main content */}
-        <Flex flex={1} direction="column" gap={6} py={4} minH={0}>
           {/* Scanned products list */}
           <VStack
             w="full"
-            flex={1}
+            maxH="120px"
             overflowY="auto"
-            gap={2}
+            gap={1}
             align="stretch"
+            opacity={hasItems && !cart.scanFeedback ? 1 : 0}
+            visibility={hasItems && !cart.scanFeedback ? 'visible' : 'hidden'}
+            transition="all 0.2s"
+            position="absolute"
+            top={0}
+            left={0}
+            right={0}
+            zIndex={1}
             css={{
               '&::-webkit-scrollbar': { width: '4px' },
               '&::-webkit-scrollbar-track': { background: 'transparent' },
@@ -136,89 +133,116 @@ export default function CashPage() {
               },
             }}
           >
-            {!hasItems ? (
-              <Flex flex={1} align="center" justify="center">
-                <Text color="fg.muted" fontSize="lg" textAlign="center">
-                  Scannez les articles à payer comptant
-                </Text>
-              </Flex>
-            ) : (
-              <>
-                <Text fontSize="xs" color="fg.muted" textAlign="center" pb={0.5}>
-                  Touchez un article pour le modifier
-                </Text>
-                {cart.scannedProducts.map((p) => (
-                  <Flex
-                    key={p.barcode}
-                    w="full"
-                    py={3}
-                    px={4}
-                    align="center"
-                    justify="space-between"
-                    borderRadius="lg"
-                    borderWidth="1px"
-                    borderColor="border"
-                    bg="bg.subtle"
-                    cursor="pointer"
-                    transition="all 0.15s"
-                    _hover={{ bg: 'bg.muted' }}
-                    _active={{ bg: 'bg.muted', transform: 'scale(0.98)' }}
-                    onClick={() => {
-                      setEditProduct(p);
-                      setEditQty(p.qty);
-                    }}
-                  >
-                    <Text fontSize={{ base: 'md', md: 'lg' }} fontWeight="700">
-                      {p.name} {p.qty > 1 ? `x${p.qty}` : ''}
-                    </Text>
-                    <HStack gap={2}>
-                      <Text fontSize={{ base: 'md', md: 'lg' }} fontWeight="700">
-                        {(p.price * p.qty).toFixed(2)}$
-                      </Text>
-                      <Flex
-                        align="center"
-                        gap={1}
-                        px={2}
-                        py={0.5}
-                        borderRadius="full"
-                        bg="bg.muted"
-                        color="fg.muted"
-                        fontSize="xs"
-                        fontWeight="600"
-                        flexShrink={0}
-                      >
-                        ✎ Modifier
-                      </Flex>
-                    </HStack>
-                  </Flex>
-                ))}
-              </>
+            {hasItems && (
+              <Text fontSize="xs" color="fg.muted" textAlign="center" pb={0.5}>
+                Touchez un article pour le modifier
+              </Text>
             )}
+            {cart.scannedProducts.map((p) => (
+              <Flex
+                key={p.barcode}
+                w="full"
+                py={2}
+                px={4}
+                align="center"
+                justify="space-between"
+                borderRadius="lg"
+                borderWidth="1px"
+                borderColor="border"
+                bg="bg.subtle"
+                cursor="pointer"
+                transition="all 0.15s"
+                _hover={{ bg: 'bg.muted' }}
+                _active={{ bg: 'bg.muted', transform: 'scale(0.98)' }}
+                onClick={() => {
+                  setEditProduct(p);
+                  setEditQty(p.qty);
+                }}
+              >
+                <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight="700">
+                  {p.name} {p.qty > 1 ? `x${p.qty}` : ''}
+                </Text>
+                <HStack gap={2}>
+                  <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight="700">
+                    {(p.price * p.qty).toFixed(2)}$
+                  </Text>
+                  <Flex
+                    align="center"
+                    gap={1}
+                    px={2}
+                    py={0.5}
+                    borderRadius="full"
+                    bg="bg.muted"
+                    color="fg.muted"
+                    fontSize="xs"
+                    fontWeight="600"
+                    flexShrink={0}
+                  >
+                    ✎ Modifier
+                  </Flex>
+                </HStack>
+              </Flex>
+            ))}
           </VStack>
+        </Box>
 
+        {/* Main content */}
+        <Flex flex={1} direction="column" justify="center" gap={6} py={4}>
           {/* Total */}
           <Box w="full" py={8} borderRadius="2xl" bg="bg.subtle" textAlign="center">
             <Text fontSize={{ base: 'lg', md: 'xl' }} fontWeight="500" color="fg.muted" mb={3}>
-              Total
+              Total à payer
             </Text>
             <Text fontSize={{ base: '7xl', md: '9xl' }} fontWeight="800" lineHeight="1">
               {cart.pendingTotal.toFixed(2)}$
             </Text>
           </Box>
 
-          {/* Confirm */}
+          {/* Quick-add */}
           <Button
             h="auto"
             py={6}
             colorPalette="gray"
-            onClick={save.handleSave}
-            loading={loading}
-            disabled={!hasItems}
+            variant="outline"
+            onClick={cart.addCoffee}
+            disabled={loading}
             fontWeight="600"
-            fontSize={{ base: 'xl', md: '2xl' }}
+            fontSize={{ base: 'lg', md: 'xl' }}
           >
-            Confirmer le paiement comptant
+            Café (+1.00$)
           </Button>
+
+          <Separator />
+
+          {/* Confirm + Cancel */}
+          <Flex direction={{ base: 'column', md: 'row' }} gap={4} w="full">
+            <Button
+              flex={{ md: 3 }}
+              h="auto"
+              py={6}
+              colorPalette="gray"
+              onClick={save.handleSave}
+              loading={loading}
+              disabled={!hasItems}
+              fontWeight="600"
+              fontSize={{ base: 'xl', md: '2xl' }}
+            >
+              Confirmer le paiement
+            </Button>
+            <Button
+              flex={{ md: 1 }}
+              h="auto"
+              py={6}
+              variant="outline"
+              colorPalette="red"
+              onClick={() => router.push('/')}
+              disabled={loading}
+              fontWeight="600"
+              fontSize={{ base: 'lg', md: 'xl' }}
+            >
+              Annuler
+            </Button>
+          </Flex>
         </Flex>
       </Flex>
 

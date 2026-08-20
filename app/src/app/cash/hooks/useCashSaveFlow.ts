@@ -4,6 +4,7 @@ import { CASH_CARD_NUMBER } from '@/lib/domain/constants';
 import type { ScannedProduct } from '../../tab/[cardNumber]/types';
 
 const INACTIVITY_TIMEOUT_MS = 15000;
+export const COUNTDOWN_SECONDS = 12;
 
 interface Params {
   pendingTotal: number;
@@ -27,7 +28,7 @@ export function useCashSaveFlow({
   editProduct,
 }: Params) {
   const [saveOpen, setSaveOpen] = useState(false);
-  const [countdown, setCountdown] = useState(5);
+  const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,11 +71,11 @@ export function useCashSaveFlow({
       timerRef.current = null;
     }
     setSaveOpen(false);
-    setCountdown(5);
+    setCountdown(COUNTDOWN_SECONDS);
   }, []);
 
   const startSaveCountdown = useCallback(() => {
-    setCountdown(5);
+    setCountdown(COUNTDOWN_SECONDS);
     setSaveOpen(true);
   }, []);
 
