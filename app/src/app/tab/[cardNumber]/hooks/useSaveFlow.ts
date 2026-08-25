@@ -36,36 +36,59 @@ export function useSaveFlow({
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const doSaveRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const handleSaveRef = useRef<() => void>(() => {});
+  const savingRef = useRef(false);
 
   const doSave = useCallback(async () => {
     if (!employee || pendingTotal === 0) return;
+    // The countdown auto-fire and the manual "Sauvegarder" button can both land
+    // here; without this guard the tab is charged twice and stock is
+    // decremented twice for a single cart.
+    if (savingRef.current) return;
+    savingRef.current = true;
 
     setLoading(true);
-    const res = await fetch('/api/employees/tab', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cardNumber, amount: pendingTotal }),
-    });
-
-    if (res.ok && scannedProducts.length > 0) {
-      await fetch('/api/transactions', {
+    try {
+      const res = await fetch('/api/employees/tab', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cardNumber,
-          totalAmount: pendingTotal,
-          items: scannedProducts.map((p) => ({
-            barcode: p.barcode,
-            name: p.name,
-            price: p.price,
-            quantity: p.qty,
-          })),
-        }),
-      }).catch(console.error);
-    }
+        body: JSON.stringify({ cardNumber, amount: pendingTotal }),
+      });
 
-    if (res.ok) router.push('/');
-    setLoading(false);
+      if (!res.ok) return;
+
+      if (scannedProducts.length > 0) {
+        // The tab is already charged: this call is what records the transaction
+        // and decrements inventory, so a failure here means real drift.
+        try {
+          const txRes = await fetch('/api/transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cardNumber,
+              totalAmount: pendingTotal,
+              items: scannedProducts.map((p) => ({
+                barcode: p.barcode,
+                name: p.name,
+                price: p.price,
+                quantity: p.qty,
+              })),
+            }),
+          });
+          if (!txRes.ok) {
+            console.error(
+              `Tab charged but transaction log failed (${txRes.status}) for card ${cardNumber}`
+            );
+          }
+        } catch (error) {
+          console.error('Tab charged but transaction log failed', error);
+        }
+      }
+
+      router.push('/');
+    } finally {
+      setLoading(false);
+      savingRef.current = false;
+    }
   }, [employee, cardNumber, pendingTotal, scannedProducts, setLoading, router]);
 
   const cancelSave = useCallback(() => {

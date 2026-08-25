@@ -1,5 +1,5 @@
 import { Product } from '@/lib/domain/entities/product.entity';
-import { IProductRepository } from '@/lib/domain/ports/product.repository.port';
+import { IProductRepository, DecrementOutcome } from '@/lib/domain/ports/product.repository.port';
 import { getDb } from '../db/mongo';
 import { randomUUID } from 'crypto';
 
@@ -95,15 +95,36 @@ export class MongoProductRepository implements IProductRepository {
   async decrementQuantity(
     id: string,
     amount: number
-  ): Promise<Product | null> {
+  ): Promise<DecrementOutcome | null> {
     const col = await this.collection();
-    const result = await col.findOneAndUpdate(
+    // Returning the *pre-update* document lets us compute how much was really
+    // applied: the pipeline clamps at 0, so a decrement can silently be partial.
+    const before = await col.findOneAndUpdate(
       { _id: id },
-      [{ $set: { quantity: { $max: [0, { $subtract: ['$quantity', amount] }] } } }],
-      { returnDocument: 'after' }
+      [
+        {
+          $set: {
+            quantity: {
+              $max: [0, { $subtract: [{ $ifNull: ['$quantity', 0] }, amount] }],
+            },
+          },
+        },
+      ],
+      { returnDocument: 'before' }
     );
-    if (!result) return null;
-    return toProduct(result);
+    if (!before) return null;
+
+    const previousQuantity =
+      typeof before.quantity === 'number' && Number.isFinite(before.quantity)
+        ? before.quantity
+        : 0;
+    const applied = Math.max(0, Math.min(previousQuantity, amount));
+
+    return {
+      product: toProduct({ ...before, quantity: previousQuantity - applied }),
+      requested: amount,
+      applied,
+    };
   }
 
   async delete(id: string): Promise<boolean> {
