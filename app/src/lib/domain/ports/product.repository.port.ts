@@ -1,14 +1,15 @@
 import { Product } from '../entities/product.entity';
 
 /**
- * Result of an inventory decrement. `applied` may be lower than `requested`
- * when the product did not have enough stock, which is the signal that
- * inventory and the recorded transaction have drifted apart.
+ * Result of an inventory decrement. `applied` may differ from `requested` and
+ * `alreadyApplied` marks a replay of a sale that was already settled, so a
+ * retry can never decrement the same product twice.
  */
 export interface DecrementOutcome {
   product: Product;
   requested: number;
   applied: number;
+  alreadyApplied: boolean;
 }
 
 export interface IProductRepository {
@@ -21,6 +22,15 @@ export interface IProductRepository {
     updates: Partial<Pick<Product, 'name' | 'price' | 'quantity' | 'barcodes'>>
   ): Promise<Product | null>;
   addBarcode(id: string, barcode: string): Promise<Product | null>;
-  decrementQuantity(id: string, amount: number): Promise<DecrementOutcome | null>;
+  /**
+   * Decrements stock exactly once for a given `saleId`, even across retries.
+   * Stock is allowed to go negative: an accurate negative count is what makes
+   * an oversell visible instead of silently clamping and creating drift.
+   */
+  decrementQuantityOnce(
+    id: string,
+    amount: number,
+    saleId: string
+  ): Promise<DecrementOutcome | null>;
   delete(id: string): Promise<boolean>;
 }

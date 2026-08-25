@@ -4,25 +4,8 @@ import { employeeRepository } from '@/lib/infrastructure/repositories/employee.r
 
 const service = new EmployeeApplicationService(employeeRepository);
 
-export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { cardNumber, amount } = body;
-
-  if (!cardNumber || typeof amount !== 'number' || amount === 0) {
-    return NextResponse.json(
-      { error: 'cardNumber and a non-zero amount are required' },
-      { status: 400 }
-    );
-  }
-
-  try {
-    const employee = await service.addToTab(cardNumber, amount);
-    return NextResponse.json(employee);
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 404 });
-  }
-}
+// There is deliberately no POST here. Charging a tab always happens through
+// POST /api/sales, so money can never move without a transaction recording it.
 
 export async function DELETE(request: NextRequest) {
   const body = await request.json();

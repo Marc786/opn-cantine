@@ -69,7 +69,11 @@ export async function GET(request: NextRequest) {
       allDays.push(todayKey);
     }
 
-    const currentValue = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
+    // Negative stock means oversold units awaiting a restock, not negative value.
+    const currentValue = products.reduce(
+      (sum, p) => sum + p.price * Math.max(0, p.quantity),
+      0
+    );
 
     // value[i] = value[i+1] + sales_on_day[i+1] − restocks_on_day[i+1]
     // (going backward: sales reduced inventory, restocks increased it)

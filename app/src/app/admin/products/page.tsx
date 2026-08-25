@@ -333,7 +333,7 @@ export default function AdminProductsPage() {
             </Text>
             <Text fontSize={{ base: 'xl', md: '2xl' }} fontWeight="800">
               {products
-                .reduce((sum, p) => sum + p.price * p.quantity, 0)
+                .reduce((sum, p) => sum + p.price * Math.max(0, p.quantity), 0)
                 .toFixed(2)}
               $ en inventaire
             </Text>
@@ -467,7 +467,17 @@ export default function AdminProductsPage() {
                     fontSize={{ base: 'md', md: 'lg' }}
                   />
                 </Flex>
-                <Flex flex={1} justify="end">
+                <Flex flex={1} justify="end" align="center" gap={2}>
+                  {currentQty < 0 && (
+                    <Text
+                      fontSize="xs"
+                      fontWeight="700"
+                      color="red.500"
+                      whiteSpace="nowrap"
+                    >
+                      à restocker
+                    </Text>
+                  )}
                   <Input
                     type="number"
                     value={currentQty}
@@ -482,7 +492,7 @@ export default function AdminProductsPage() {
                     fontWeight="600"
                     fontSize={{ base: 'md', md: 'lg' }}
                     color={
-                      currentQty === 0
+                      currentQty <= 0
                         ? 'red.500'
                         : currentQty < 5
                           ? 'yellow.500'

@@ -46,7 +46,13 @@ export function useCart(setUnknownOpen: (open: boolean) => void) {
           }
           return [
             ...prev,
-            { barcode: value, name: product.name, price: product.price, qty: 1 },
+            {
+              barcode: value,
+              name: product.name,
+              price: product.price,
+              qty: 1,
+              productId: product.id ?? null,
+            },
           ];
         });
 
