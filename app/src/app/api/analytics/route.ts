@@ -4,6 +4,7 @@ import { productRepository } from '@/lib/infrastructure/repositories/product.rep
 import { restockEventRepository } from '@/lib/infrastructure/repositories/restock-event.repository.mongo';
 import { employeeRepository } from '@/lib/infrastructure/repositories/employee.repository.mongo';
 import { verifyAdminRequest, unauthorizedResponse } from '@/lib/infrastructure/auth/admin-token';
+import { averageRevenuePerWeek } from '@/lib/domain/revenue-stats';
 
 function toDateKey(date: Date): string {
   const y = date.getFullYear();
@@ -95,7 +96,15 @@ export async function GET(request: NextRequest) {
       employees.reduce((sum, e) => sum + e.tab, 0).toFixed(2)
     );
 
-    return NextResponse.json({ transactionsByDay, tabHistory, inventoryHistory, totalUnpaidTabs });
+    const weeklyRevenue = averageRevenuePerWeek(sorted);
+
+    return NextResponse.json({
+      transactionsByDay,
+      tabHistory,
+      inventoryHistory,
+      totalUnpaidTabs,
+      weeklyRevenue,
+    });
   } catch (error: unknown) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal Server Error' },
