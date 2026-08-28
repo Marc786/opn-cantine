@@ -1,4 +1,4 @@
-import { Transaction } from '../entities/transaction.entity';
+import { Transaction, InventoryLine } from '../entities/transaction.entity';
 
 export interface PaginatedOptions {
   page: number;
@@ -12,8 +12,21 @@ export interface PaginatedResult {
   total: number;
 }
 
+/** `created: false` means this sale id was already recorded (a retry). */
+export interface InsertOnceResult {
+  created: boolean;
+  transaction: Transaction;
+}
+
 export interface ITransactionRepository {
   save(transaction: Transaction): Promise<Transaction>;
+  /** Inserts a sale keyed by its id, or returns the already-recorded one. */
+  insertOnce(transaction: Transaction): Promise<InsertOnceResult>;
+  markSettlement(
+    id: string,
+    settlement: { tabApplied: boolean; inventory: InventoryLine[]; settled: boolean }
+  ): Promise<void>;
+  findById(id: string): Promise<Transaction | null>;
   findAll(): Promise<Transaction[]>;
   findByCardNumber(cardNumber: string): Promise<Transaction[]>;
   findPaginated(options: PaginatedOptions): Promise<PaginatedResult>;

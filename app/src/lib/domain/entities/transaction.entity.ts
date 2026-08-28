@@ -3,14 +3,40 @@ export interface TransactionItem {
   name: string;
   price: number;
   quantity: number;
+  /** Resolved at scan time so a later barcode edit cannot orphan the line. */
+  productId?: string | null;
+}
+
+export type InventoryLineStatus =
+  | 'applied'
+  | 'not_tracked'
+  | 'product_not_found'
+  | 'oversold'
+  | 'failed';
+
+export interface InventoryLine {
+  barcode: string;
+  name: string;
+  productId: string | null;
+  requested: number;
+  applied: number;
+  status: InventoryLineStatus;
+  message?: string;
 }
 
 export interface Transaction {
+  /** Client-generated sale id. Doubles as the Mongo `_id` for idempotency. */
   id?: string;
   cardNumber: string;
   items: TransactionItem[];
   totalAmount: number;
   timestamp: Date;
+  /** Whether the employee tab was charged for this sale. */
+  tabApplied?: boolean;
+  /** Per-line inventory outcome, written once the decrements have run. */
+  inventory?: InventoryLine[];
+  /** True once tab and inventory have both been fully settled. */
+  settled?: boolean;
 }
 
 export class TransactionEntity implements Transaction {
@@ -41,13 +67,15 @@ export class TransactionEntity implements Transaction {
   static create(
     cardNumber: string,
     items: TransactionItem[],
-    totalAmount: number
+    totalAmount: number,
+    id?: string
   ): TransactionEntity {
     return new TransactionEntity(
       cardNumber.trim(),
       items,
       totalAmount,
-      new Date()
+      new Date(),
+      id
     );
   }
 }

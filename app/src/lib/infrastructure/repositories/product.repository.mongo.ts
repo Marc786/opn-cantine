@@ -1,7 +1,14 @@
 import { Product } from '@/lib/domain/entities/product.entity';
-import { IProductRepository } from '@/lib/domain/ports/product.repository.port';
+import { IProductRepository, DecrementOutcome } from '@/lib/domain/ports/product.repository.port';
 import { getDb } from '../db/mongo';
+import { APPLIED_SALES_HISTORY } from '@/lib/domain/inventory-rules';
 import { randomUUID } from 'crypto';
+
+interface AppliedSale {
+  saleId: string;
+  amount: number;
+  at?: Date;
+}
 
 interface ProductDocument {
   _id: string;
@@ -10,6 +17,8 @@ interface ProductDocument {
   price: number;
   quantity: number;
   createdAt?: Date;
+  /** Recent sales already applied to this product, for exactly-once retries. */
+  appliedSales?: AppliedSale[];
 }
 
 function toProduct(doc: ProductDocument): Product {
@@ -92,18 +101,56 @@ export class MongoProductRepository implements IProductRepository {
     return toProduct(result);
   }
 
-  async decrementQuantity(
+  async decrementQuantityOnce(
     id: string,
-    amount: number
-  ): Promise<Product | null> {
+    amount: number,
+    saleId: string
+  ): Promise<DecrementOutcome | null> {
     const col = await this.collection();
-    const result = await col.findOneAndUpdate(
-      { _id: id },
-      [{ $set: { quantity: { $max: [0, { $subtract: ['$quantity', amount] }] } } }],
-      { returnDocument: 'after' }
+
+    // Single atomic conditional update: the guard on `appliedSales.saleId` and
+    // the `$inc` commit together, so there is no window in which a crash could
+    // apply the decrement twice or record it without applying it.
+    const before = await col.findOneAndUpdate(
+      { _id: id, 'appliedSales.saleId': { $ne: saleId } },
+      {
+        $inc: { quantity: -amount },
+        $push: {
+          appliedSales: {
+            $each: [{ saleId, amount, at: new Date() }],
+            $slice: -APPLIED_SALES_HISTORY,
+          },
+        },
+      },
+      { returnDocument: 'before' }
     );
-    if (!result) return null;
-    return toProduct(result);
+
+    if (before) {
+      const previousQuantity =
+        typeof before.quantity === 'number' && Number.isFinite(before.quantity)
+          ? before.quantity
+          : 0;
+      return {
+        product: toProduct({ ...before, quantity: previousQuantity - amount }),
+        requested: amount,
+        applied: amount,
+        alreadyApplied: false,
+      };
+    }
+
+    // Guard failed: either the product is gone, or this sale was already applied.
+    const current = await col.findOne({ _id: id });
+    if (!current) return null;
+
+    const previous = (current.appliedSales ?? []).find((s) => s.saleId === saleId);
+    if (!previous) return null;
+
+    return {
+      product: toProduct(current),
+      requested: amount,
+      applied: previous.amount,
+      alreadyApplied: true,
+    };
   }
 
   async delete(id: string): Promise<boolean> {

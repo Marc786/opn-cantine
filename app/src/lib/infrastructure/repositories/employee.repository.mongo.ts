@@ -1,23 +1,44 @@
 import { Employee } from '@/lib/domain/entities/employee.entity';
-import { IEmployeeRepository } from '@/lib/domain/ports/employee.repository.port';
+import {
+  IEmployeeRepository,
+  TabChargeOutcome,
+} from '@/lib/domain/ports/employee.repository.port';
 import { getDb } from '../db/mongo';
+import { APPLIED_SALES_HISTORY } from '@/lib/domain/inventory-rules';
+
+interface EmployeeDocument extends Employee {
+  /** Sale ids already charged to this tab, for exactly-once retries. */
+  appliedSaleIds?: string[];
+}
+
+function toEmployee(doc: EmployeeDocument): Employee {
+  return {
+    cardNumber: doc.cardNumber,
+    employeeNumber: doc.employeeNumber,
+    tab: doc.tab,
+  };
+}
 
 export class MongoEmployeeRepository implements IEmployeeRepository {
   private readonly collectionName = 'employees';
 
   private async collection() {
     const db = await getDb();
-    return db.collection<Employee>(this.collectionName);
+    return db.collection<EmployeeDocument>(this.collectionName);
   }
 
   async findByCardNumber(cardNumber: string): Promise<Employee | null> {
     const col = await this.collection();
-    return col.findOne({ cardNumber });
+    const doc = await col.findOne({ cardNumber });
+    return doc ? toEmployee(doc) : null;
   }
 
   async searchByEmployeeNumber(query: string): Promise<Employee[]> {
     const col = await this.collection();
-    return col.find({ employeeNumber: { $regex: query, $options: 'i' } }).toArray();
+    const docs = await col
+      .find({ employeeNumber: { $regex: query, $options: 'i' } })
+      .toArray();
+    return docs.map(toEmployee);
   }
 
   async save(employee: Employee): Promise<Employee> {
@@ -36,12 +57,43 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
       { $set: { tab } },
       { returnDocument: 'after' }
     );
-    return result ?? null;
+    return result ? toEmployee(result) : null;
+  }
+
+  async applyTabChargeOnce(
+    cardNumber: string,
+    amount: number,
+    saleId: string
+  ): Promise<TabChargeOutcome | null> {
+    const col = await this.collection();
+
+    // Atomic conditional `$inc`: guard and increment commit together, so
+    // concurrent saves cannot lose an update and a retry cannot double-charge.
+    const charged = await col.findOneAndUpdate(
+      { cardNumber, appliedSaleIds: { $ne: saleId } },
+      {
+        $inc: { tab: amount },
+        $push: {
+          appliedSaleIds: { $each: [saleId], $slice: -APPLIED_SALES_HISTORY },
+        },
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (charged) {
+      return { employee: toEmployee(charged), alreadyApplied: false };
+    }
+
+    const existing = await col.findOne({ cardNumber });
+    if (!existing) return null;
+
+    return { employee: toEmployee(existing), alreadyApplied: true };
   }
 
   async findAll(): Promise<Employee[]> {
     const col = await this.collection();
-    return col.find().toArray();
+    const docs = await col.find().toArray();
+    return docs.map(toEmployee);
   }
 
   async delete(cardNumber: string): Promise<boolean> {
@@ -59,7 +111,7 @@ export class MongoEmployeeRepository implements IEmployeeRepository {
       { $set: { employeeNumber: newEmployeeNumber } },
       { returnDocument: 'after' }
     );
-    return result ?? null;
+    return result ? toEmployee(result) : null;
   }
 }
 

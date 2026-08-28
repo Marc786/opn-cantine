@@ -9,4 +9,6 @@ export interface ScannedProduct {
   name: string;
   price: number;
   qty: number;
+  /** Product id resolved at scan time; absent for quick-add pseudo items. */
+  productId?: string | null;
 }
