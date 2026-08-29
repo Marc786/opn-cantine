@@ -2,15 +2,27 @@
 
 import { useEffect } from 'react';
 import { ChakraProvider, createSystem, defaultConfig, defineConfig } from '@chakra-ui/react';
+import { usePathname } from 'next/navigation';
+import { WeatherThemeProvider, useWeatherTheme } from '@/components/WeatherThemeContext';
+import { WeatherBackground } from '@/components/WeatherBackground';
 
 const system = createSystem(defaultConfig, defineConfig({
   conditions: {
-    // Scope dark mode to [data-theme=dark] attribute only.
-    // Since we set data-theme="light" on <html> and never change it,
-    // dark mode styles will never apply.
     dark: '[data-theme=dark] &',
   },
 }));
+
+function AppShell({ children }: { children: React.ReactNode }) {
+  const { theme } = useWeatherTheme();
+  const pathname = usePathname();
+  const isAdmin = pathname.startsWith('/admin');
+  return (
+    <>
+      {!isAdmin && <WeatherBackground theme={theme} />}
+      {children}
+    </>
+  );
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -21,7 +33,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <ChakraProvider value={system}>
-      {children}
+      <WeatherThemeProvider>
+        <AppShell>{children}</AppShell>
+      </WeatherThemeProvider>
     </ChakraProvider>
   );
 }
