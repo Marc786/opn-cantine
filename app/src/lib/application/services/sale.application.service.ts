@@ -8,10 +8,12 @@ import { ITransactionRepository } from '@/lib/domain/ports/transaction.repositor
 import { IEmployeeRepository } from '@/lib/domain/ports/employee.repository.port';
 import { IProductRepository } from '@/lib/domain/ports/product.repository.port';
 import { isInventoryTracked } from '@/lib/domain/inventory-rules';
+import { isCashSale } from '@/lib/domain/constants';
 
 export interface SaleResult {
   transaction: Transaction;
-  employee: { cardNumber: string; employeeNumber: string; tab: number };
+  /** Null for a cash sale, which charges no tab because nobody owns it. */
+  employee: { cardNumber: string; employeeNumber: string; tab: number } | null;
   inventory: InventoryLine[];
   /** Lines that moved no stock despite being sold. Empty means zero drift. */
   issues: InventoryLine[];
@@ -55,8 +57,15 @@ export class SaleApplicationService {
     items: TransactionItem[],
     totalAmount: number
   ): Promise<SaleResult> {
-    const employee = await this.employeeRepository.findByCardNumber(cardNumber);
-    if (!employee) throw new EmployeeNotFoundError(cardNumber);
+    // A cash sale is paid on the spot, so there is no account to look up and no
+    // tab to charge. The ledger entry and the stock decrement still happen, and
+    // still exactly once — that is the whole point of routing cash through here.
+    const cash = isCashSale(cardNumber);
+
+    if (!cash) {
+      const employee = await this.employeeRepository.findByCardNumber(cardNumber);
+      if (!employee) throw new EmployeeNotFoundError(cardNumber);
+    }
 
     const draft = TransactionEntity.create(cardNumber, items, totalAmount, saleId);
     const { created, transaction } = await this.transactionRepository.insertOnce(draft);
@@ -66,19 +75,27 @@ export class SaleApplicationService {
     const authoritativeItems = created ? items : transaction.items;
     const authoritativeTotal = created ? totalAmount : transaction.totalAmount;
 
-    const charge = await this.employeeRepository.applyTabChargeOnce(
-      cardNumber,
-      authoritativeTotal,
-      saleId
-    );
-    if (!charge) throw new EmployeeNotFoundError(cardNumber);
+    let charge: Awaited<
+      ReturnType<IEmployeeRepository['applyTabChargeOnce']>
+    > = null;
+    if (!cash) {
+      charge = await this.employeeRepository.applyTabChargeOnce(
+        cardNumber,
+        authoritativeTotal,
+        saleId
+      );
+      if (!charge) throw new EmployeeNotFoundError(cardNumber);
+    }
 
     const inventory = await this.applyInventory(authoritativeItems, saleId);
     const issues = inventory.filter(isDrift);
     const warnings = inventory.filter((line) => line.status === 'oversold');
 
+    // A cash sale never charges a tab, so claiming it did would misreport it.
+    const tabApplied = !cash;
+
     await this.transactionRepository.markSettlement(saleId, {
-      tabApplied: true,
+      tabApplied,
       inventory,
       settled: issues.length === 0,
     });
@@ -86,11 +103,11 @@ export class SaleApplicationService {
     return {
       transaction: {
         ...transaction,
-        tabApplied: true,
+        tabApplied,
         inventory,
         settled: issues.length === 0,
       },
-      employee: charge.employee,
+      employee: charge ? charge.employee : null,
       inventory,
       issues,
       warnings,

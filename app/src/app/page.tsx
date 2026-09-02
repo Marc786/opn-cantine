@@ -6,6 +6,7 @@ import {
   Flex,
   Heading,
   Input,
+  Separator,
   Text,
   VStack,
 } from '@chakra-ui/react';
@@ -238,18 +239,13 @@ export default function Home() {
         <Image src="/bell.png" alt="Bell" width={64} height={64} priority />
       </Box>
 
-      <VStack gap={2}>
-        <Heading
-          size={{ base: '4xl', md: '6xl' }}
-          fontWeight="800"
-          letterSpacing="-0.02em"
-        >
-          Cantine
-        </Heading>
-        <Text color="fg.muted" fontSize={{ base: 'lg', md: 'xl' }}>
-          {isSearchMode ? "Recherchez votre numéro d'employé" : 'Scannez votre carte'}
-        </Text>
-      </VStack>
+      <Heading
+        size={{ base: '4xl', md: '6xl' }}
+        fontWeight="800"
+        letterSpacing="-0.02em"
+      >
+        Cantine
+      </Heading>
 
       {announcement && (
         <Box
@@ -270,111 +266,162 @@ export default function Home() {
         </Box>
       )}
 
-      {!isSearchMode ? (
-        <>
-          {/* Hidden input to capture card reader scan */}
-          <Input
-            ref={inputRef}
-            value={cardNumber}
-            onBlur={() => {
-              if (!isSearchMode) inputRef.current?.focus();
-            }}
-            onChange={e => {
-              const val = e.target.value.replace(/\D/g, '');
-              setCardNumber(val);
-              setError('');
-            }}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                handleSubmit();
-              }
-            }}
-            position="absolute"
-            opacity={0}
-            h={0}
-            w={0}
-            overflow="hidden"
-            inputMode="none"
-            autoFocus
-          />
+      <Flex
+        w="full"
+        maxW="900px"
+        direction="row"
+        align="stretch"
+        justify="center"
+        gap={{ base: 6, md: 10 }}
+      >
+        {/* Left pane — card scan / employee search */}
+        <VStack flex={1} gap={6} justify="center" minW={0}>
+          <Text color="fg.muted" fontSize={{ base: 'lg', md: 'xl' }}>
+            {isSearchMode ? "Recherchez votre numéro d'employé" : 'Scannez votre carte'}
+          </Text>
+          {!isSearchMode ? (
+            <>
+              {/* Hidden input to capture card reader scan */}
+              <Input
+                ref={inputRef}
+                value={cardNumber}
+                onBlur={() => {
+                  if (!isSearchMode) inputRef.current?.focus();
+                }}
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  setCardNumber(val);
+                  setError('');
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    handleSubmit();
+                  }
+                }}
+                position="absolute"
+                opacity={0}
+                h={0}
+                w={0}
+                overflow="hidden"
+                inputMode="none"
+                autoFocus
+              />
 
-          {error && (
-            <Text color="red.500" fontSize="lg">
-              {error}
-            </Text>
+              {error && (
+                <Text color="red.500" fontSize="lg">
+                  {error}
+                </Text>
+              )}
+
+              {loading && (
+                <Text color="fg.muted" fontSize="lg">
+                  Chargement...
+                </Text>
+              )}
+
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setIsSearchMode(true)}
+              >
+                J&apos;ai oublié ma carte
+              </Button>
+            </>
+          ) : (
+            <VStack w="full" maxW="md" gap={4}>
+              <Input
+                placeholder="Tapez votre numéro d'employé..."
+                size="lg"
+                value={searchQuery}
+                autoFocus
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSearchQuery(val);
+
+                  if (searchDebounceTimerRef.current) {
+                    clearTimeout(searchDebounceTimerRef.current);
+                  }
+
+                  searchDebounceTimerRef.current = setTimeout(() => {
+                    handleSearch(val);
+                  }, 300);
+                }}
+              />
+
+              <VStack w="full" align="stretch" maxH="300px" overflowY="auto" gap={2}>
+                {searchResults.map((emp) => (
+                  <Button
+                    key={emp.cardNumber}
+                    variant="outline"
+                    size="lg"
+                    justifyContent="flex-start"
+                    onClick={() => {
+                      startSession();
+                      router.push(`/tab/${encodeURIComponent(emp.cardNumber)}`);
+                    }}
+                  >
+                    {emp.employeeNumber}
+                  </Button>
+                ))}
+                {searchQuery.trim().length > 0 && searchResults.length === 0 && (
+                  <Text color="fg.muted" textAlign="center" py={4}>
+                    Aucun résultat.
+                  </Text>
+                )}
+              </VStack>
+
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIsSearchMode(false);
+                  setSearchQuery('');
+                  setSearchResults([]);
+                  setCardNumber('');
+                  setError('');
+                }}
+              >
+                Retour
+              </Button>
+            </VStack>
           )}
+        </VStack>
 
-          {loading && (
-            <Text color="fg.muted" fontSize="lg">
-              Chargement...
-            </Text>
-          )}
+        <Separator orientation="vertical" h="auto" alignSelf="stretch" />
 
+        {/* Right pane — cash payment */}
+        <VStack flex={1} gap={4} justify="center" textAlign="center" minW={0}>
+          <Text color="fg.muted" fontSize={{ base: 'lg', md: 'xl' }}>
+            Paiement comptant
+          </Text>
+          <Text color="fg.muted" fontSize={{ base: 'sm', md: 'md' }} maxW="360px">
+            Payer directement comptant - aucun compte requis
+          </Text>
           <Button
             variant="outline"
             size="lg"
-            onClick={() => setIsSearchMode(true)}
-          >
-            J&apos;ai oublié ma carte
-          </Button>
-        </>
-      ) : (
-        <VStack w="full" maxW="md" gap={4}>
-          <Input
-            placeholder="Tapez votre numéro d'employé..."
-            size="lg"
-            value={searchQuery}
-            autoFocus
-            onChange={(e) => {
-              const val = e.target.value;
-              setSearchQuery(val);
-              
-              if (searchDebounceTimerRef.current) {
-                clearTimeout(searchDebounceTimerRef.current);
-              }
-              
-              searchDebounceTimerRef.current = setTimeout(() => {
-                handleSearch(val);
-              }, 300);
-            }}
-          />
-
-          <VStack w="full" align="stretch" maxH="300px" overflowY="auto" gap={2}>
-            {searchResults.map((emp) => (
-              <Button
-                key={emp.cardNumber}
-                variant="outline"
-                size="lg"
-                justifyContent="flex-start"
-                onClick={() => {
-                  startSession();
-                  router.push(`/tab/${encodeURIComponent(emp.cardNumber)}`);
-                }}
-              >
-                {emp.employeeNumber}
-              </Button>
-            ))}
-            {searchQuery.trim().length > 0 && searchResults.length === 0 && (
-              <Text color="fg.muted" textAlign="center" py={4}>
-                Aucun résultat.
-              </Text>
-            )}
-          </VStack>
-
-          <Button
-            variant="ghost"
             onClick={() => {
-              setIsSearchMode(false);
-              setSearchQuery('');
-              setSearchResults([]);
-              setCardNumber('');
-              setError('');
+              startSession();
+              router.push('/cash');
             }}
           >
-            Retour
+            Payer comptant
           </Button>
         </VStack>
-      )}
+      </Flex>
+
+      {/* Price check sits below the two panes rather than beside them: it is a
+          lookup, not a way to pay, and putting it in the row would read as a
+          third payment method. */}
+      <Button
+        variant="outline"
+        size="lg"
+        onClick={() => {
+          startSession();
+          router.push('/price');
+        }}
+      >
+        Vérifier un prix
+      </Button>
 
       <Button
         variant="ghost"
