@@ -21,6 +21,7 @@ import { ResetModal } from './components/ResetModal';
 import { EditProductModal } from './components/EditProductModal';
 import { UnknownProductModal } from './components/UnknownProductModal';
 import type { Employee, ScannedProduct } from './types';
+import { logAction, logActionOnce } from '@/lib/client/action-log.client';
 
 type AnnouncementProduct = { name: string; price: number };
 type AnnouncementEvent = {
@@ -105,8 +106,14 @@ export default function TabPage({
       );
       const data = await res.json();
       if (data.found) {
+        logActionOnce('login', 'login', {
+          cardNumber,
+          employeeNumber: data.employee.employeeNumber,
+          tab: data.employee.tab,
+        });
         setEmployee(data.employee);
       } else {
+        logActionOnce('login', 'login', { cardNumber, outcome: 'not_found' });
         router.push('/');
       }
     };
@@ -131,6 +138,7 @@ export default function TabPage({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cardNumber }),
     });
+    logAction('reset_tab', { cardNumber, previousTab: employee?.tab ?? null, ok: res.ok });
     if (res.ok) {
       const data = await res.json();
       setEmployee(data);
@@ -462,6 +470,12 @@ export default function TabPage({
         onOpenChange={(open) => { if (!open) setEditProduct(null); }}
         onDelete={() => {
           if (!editProduct) return;
+          logAction('remove_item', {
+            barcode: editProduct.barcode,
+            name: editProduct.name,
+            qty: editProduct.qty,
+            price: editProduct.price,
+          });
           cart.setPendingTotal((prev) => prev - editProduct.qty * editProduct.price);
           cart.setScannedProducts((prev) =>
             prev.filter((p) => p.lineId !== editProduct.lineId)
@@ -471,6 +485,13 @@ export default function TabPage({
         onConfirm={(newQty) => {
           if (!editProduct) return;
           const delta = newQty - editProduct.qty;
+          logAction('modify_item', {
+            barcode: editProduct.barcode,
+            name: editProduct.name,
+            fromQty: editProduct.qty,
+            toQty: newQty,
+            price: editProduct.price,
+          });
           cart.setPendingTotal((prev) => prev + delta * editProduct.price);
           cart.setScannedProducts((prev) =>
             prev.map((p) => (p.lineId === editProduct.lineId ? { ...p, qty: newQty } : p))

@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import type { ScannedProduct } from '../types';
 import { addUnit } from '../cart-lines';
+import { logAction } from '@/lib/client/action-log.client';
 
 const RAPID_INPUT_THRESHOLD_MS = 80;
 const AUTO_SUBMIT_DELAY_MS = 300;
@@ -31,6 +32,7 @@ export function useCart(setUnknownOpen: (open: boolean) => void) {
         const data = await res.json();
 
         if (!data.found) {
+          logAction('scan_unknown', { barcode: value });
           setUnknownOpen(true);
           return;
         }
@@ -47,9 +49,17 @@ export function useCart(setUnknownOpen: (open: boolean) => void) {
           })
         );
 
+        logAction('scan', {
+          barcode: value,
+          productId: product.id ?? null,
+          name: product.name,
+          price: product.price,
+        });
+
         setScanFeedback(`${product.name} — ${product.price.toFixed(2)}$`);
         setTimeout(() => setScanFeedback(''), 3000);
       } catch {
+        logAction('scan', { barcode: value, error: 'lookup_failed' });
         setScanFeedback('Erreur de connexion');
         setTimeout(() => setScanFeedback(''), 3000);
       }
@@ -64,6 +74,7 @@ export function useCart(setUnknownOpen: (open: boolean) => void) {
     if (now - lastAddRef.current < 300) return;
     lastAddRef.current = now;
 
+    logAction('quick_add', { barcode: '_cafe_', name: 'Café', price: 1.0 });
     setPendingTotal((prev) => prev + 1);
     setScannedProducts((prev) =>
       addUnit(prev, { barcode: '_cafe_', name: 'Café', price: 1.0 })
@@ -75,6 +86,7 @@ export function useCart(setUnknownOpen: (open: boolean) => void) {
     if (now - lastAddRef.current < 300) return;
     lastAddRef.current = now;
 
+    logAction('quick_add', { barcode: '_event_', name, price });
     setPendingTotal((prev) => prev + price);
     setScannedProducts((prev) => addUnit(prev, { barcode: '_event_', name, price }));
   };

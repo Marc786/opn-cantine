@@ -39,6 +39,7 @@
     "eslint-config-next": "15.5.14",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
+    "fake-indexeddb": "^6.2.5",
     "mongodb-memory-server": "^11.2.0",
     "prettier": "^3.8.1",
     "tsx": "^4.20.6",

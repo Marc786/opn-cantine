@@ -146,3 +146,35 @@ stock movements can be reconciled against the ledger at any time.
 
 Barcodes starting with `_` (`_cafe_`, `_event_`) are quick-add items: billed,
 but intentionally not inventory-tracked.
+
+## Action log (on-device)
+
+The kiosk keeps a local, append-only trail of what happened on it: login, scan,
+quick-add, item edits, save/confirm/cancel, auto-logout and disconnect. It is
+meant for debugging after the fact — one shared iPad, so the actions are
+strictly sequential.
+
+Read and export it from **Admin → Journal**, on the device in question.
+
+- **Stored in IndexedDB**, not localStorage: appends happen on the barcode-scan
+  hot path, and localStorage is synchronous and string-only, so every append
+  would re-serialise the whole log on the main thread. IndexedDB's
+  auto-incrementing key also *is* the sequence number.
+- **Sequence, not timestamps, defines order.** `seq` is monotonic; `at` is the
+  device clock and can jump.
+- **Capped at 5000 entries**, oldest dropped, so the origin never bloats.
+- **Card numbers are redacted to the last four digits**, and PINs/tokens are
+  dropped, by the log itself rather than by each call site. An export can be
+  mailed around; it must not be a list of working credentials.
+- **Exports as NDJSON** (one entry per line), so a partial copy still parses and
+  `grep` works on it.
+- **Best-effort by design.** Storage can be unavailable, full, or evicted;
+  logging failures are swallowed and never interrupt a sale.
+
+Sale entries carry the `saleId`, which is the same id used as the transaction
+`_id` server-side — that is what lets a client trail be lined up against the
+ledger.
+
+> Storage is per-origin and sandboxed: the file cannot be picked up off the
+> device's filesystem, the app has to hand it over. Clearing site data or
+> browser eviction loses it.
