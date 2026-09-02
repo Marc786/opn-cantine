@@ -39,8 +39,17 @@ export interface ActionEntry {
 
 export type NewActionEntry = Omit<ActionEntry, 'seq'>;
 
-/** Entries kept on device before the oldest are dropped. */
-export const LOG_CAPACITY = 5000;
+/**
+ * Entries kept on device before the oldest are dropped.
+ *
+ * Sized for retention, not for storage. An entry serialises to roughly 200
+ * bytes, so this is about 10 MB of NDJSON — nothing next to the origin quota,
+ * and trimming costs the same whatever the capacity because it only deletes
+ * the overflow. A busy day is on the order of 3000 entries, so this keeps a
+ * couple of weeks: long enough that a bug noticed on Monday is still in the
+ * log, which is the whole point of keeping one.
+ */
+export const LOG_CAPACITY = 50000;
 
 const CARD_SUFFIX_LENGTH = 4;
 

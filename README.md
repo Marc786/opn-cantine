@@ -162,7 +162,11 @@ Read and export it from **Admin → Journal**, on the device in question.
   auto-incrementing key also *is* the sequence number.
 - **Sequence, not timestamps, defines order.** `seq` is monotonic; `at` is the
   device clock and can jump.
-- **Capped at 5000 entries**, oldest dropped, so the origin never bloats.
+- **Capped at 50 000 entries**, oldest dropped, so the origin never bloats.
+  That is roughly 10 MB of NDJSON (an entry serialises to about 200 bytes) and
+  covers about two weeks even on a busy day — a bug reported on Monday is still
+  in the log. The cap is sized for retention rather than storage: trimming only
+  deletes the overflow, so a larger cap costs nothing at write time.
 - **Card numbers are redacted to the last four digits**, and PINs/tokens are
   dropped, by the log itself rather than by each call site. An export can be
   mailed around; it must not be a list of working credentials.

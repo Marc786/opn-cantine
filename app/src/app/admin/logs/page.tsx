@@ -51,7 +51,7 @@ export default function LogsPage() {
     <Flex direction="column" px={8} py={6} gap={4}>
       <Text fontSize="sm" color="fg.muted">
         Journal des actions enregistré <strong>sur cet appareil uniquement</strong> (max{' '}
-        {LOG_CAPACITY} entrées, les plus anciennes sont supprimées). Exportez-le depuis
+        {LOG_CAPACITY.toLocaleString('fr-CA')} entrées, les plus anciennes sont supprimées). Exportez-le depuis
         l&apos;iPad concerné : il n&apos;est pas synchronisé avec le serveur.
       </Text>
 
