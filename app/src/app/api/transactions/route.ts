@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TransactionApplicationService } from '@/lib/application/services/transaction.application.service';
 import { transactionRepository } from '@/lib/infrastructure/repositories/transaction.repository.mongo';
-import { productRepository } from '@/lib/infrastructure/repositories/product.repository.mongo';
 import { verifyAdminRequest, unauthorizedResponse } from '@/lib/infrastructure/auth/admin-token';
 
 const service = new TransactionApplicationService(transactionRepository);
@@ -36,6 +35,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!verifyAdminRequest(request)) return unauthorizedResponse();
+
   try {
     const body = await request.json();
     const { cardNumber, items, totalAmount } = body;
@@ -51,20 +52,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'No items to log' });
     }
 
+    // Sales must go through POST /api/sales, which charges the tab and
+    // decrements stock in the same idempotent unit of work. This path only
+    // remains for admin backfills and deliberately touches neither.
     const result = await service.logTransaction(cardNumber, items, totalAmount);
-
-    // Decrement inventory server-side, in the same request as the transaction log.
-    // Using Promise.allSettled so a failed decrement for one item doesn't block others.
-    await Promise.allSettled(
-      items
-        .filter((item) => item.barcode && !item.barcode.startsWith('_') && item.quantity > 0)
-        .map(async (item) => {
-          const product = await productRepository.findByBarcode(item.barcode);
-          if (product) {
-            await productRepository.decrementQuantity(product.id, item.quantity);
-          }
-        })
-    );
 
     return NextResponse.json({ success: true, transaction: result });
   } catch (error: unknown) {

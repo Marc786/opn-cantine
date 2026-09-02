@@ -13,6 +13,7 @@ import {
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { startSession } from '@/lib/client/action-log.client';
 
 const CARD_CODE_LENGTH = 12;
 
@@ -117,6 +118,9 @@ export default function Home() {
       const data = await res.json();
 
       if (data.found) {
+        // A new session id per login keeps each visit to the kiosk separable in
+        // the exported log.
+        startSession();
         router.push(`/tab/${encodeURIComponent(value)}`);
       } else {
         router.push(
@@ -191,6 +195,7 @@ export default function Home() {
         }
       }
 
+      startSession();
       router.push(`/tab/${encodeURIComponent(card)}`);
     } catch {
       setError('Erreur de connexion. Réessayez.');
@@ -350,7 +355,10 @@ export default function Home() {
                     variant="outline"
                     size="lg"
                     justifyContent="flex-start"
-                    onClick={() => router.push(`/tab/${encodeURIComponent(emp.cardNumber)}`)}
+                    onClick={() => {
+                      startSession();
+                      router.push(`/tab/${encodeURIComponent(emp.cardNumber)}`);
+                    }}
                   >
                     {emp.employeeNumber}
                   </Button>

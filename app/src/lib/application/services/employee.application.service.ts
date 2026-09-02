@@ -22,18 +22,6 @@ export class EmployeeApplicationService {
     return this.employeeRepository.save(employee);
   }
 
-  async addToTab(cardNumber: string, amount: number) {
-    const employee =
-      await this.employeeRepository.findByCardNumber(cardNumber);
-    if (!employee) {
-      throw new Error('Employee not found');
-    }
-    return this.employeeRepository.updateTab(
-      cardNumber,
-      employee.tab + amount
-    );
-  }
-
   async resetTab(cardNumber: string) {
     return this.employeeRepository.updateTab(cardNumber, 0);
   }

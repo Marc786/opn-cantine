@@ -66,8 +66,8 @@ export class ProductApplicationService {
     return results;
   }
 
-  async decrementQuantity(id: string, amount: number = 1) {
-    return this.productRepository.decrementQuantity(id, amount);
+  async decrementQuantityOnce(id: string, amount: number, saleId: string) {
+    return this.productRepository.decrementQuantityOnce(id, amount, saleId);
   }
 
   async deleteProduct(id: string) {
