@@ -453,7 +453,7 @@ export default function TabPage({
         projectedTab={projectedTab}
         onCancel={save.cancelSave}
         onSave={() => {
-          save.cancelSave();
+          save.closeSaveCountdown();
           save.doSave();
         }}
       />

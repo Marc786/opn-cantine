@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Employee, ScannedProduct } from '../types';
 import { flushActionLog, logAction } from '@/lib/client/action-log.client';
+import { createCountdownGuard } from '@/lib/client/countdown-guard';
 
 const INACTIVITY_TIMEOUT_MS = 15000;
 const SAVE_ATTEMPTS = 3;
@@ -50,6 +51,7 @@ export function useSaveFlow({
   const handleSaveRef = useRef<() => void>(() => {});
   const savingRef = useRef(false);
   const saleIdRef = useRef<string | null>(null);
+  const countdownGuard = useRef(createCountdownGuard()).current;
 
   const doSave = useCallback(async () => {
     if (!employee || pendingTotal === 0) return;
@@ -146,24 +148,31 @@ export function useSaveFlow({
   // Tears the countdown down without judging why. The auto-fire path uses this
   // too, so it must not be recorded as a user cancelling.
   const closeSaveCountdown = useCallback(() => {
+    countdownGuard.close();
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
     setSaveOpen(false);
     setCountdown(5);
-  }, []);
+  }, [countdownGuard]);
 
+  // Only the call that closes a *running* countdown is a cancellation. The
+  // dialog reports a dismissal from both its button and its onOpenChange, and
+  // it also closes on confirm and on auto-fire; the guard keeps those silent.
   const cancelSave = useCallback(() => {
-    logAction('save_cancel', { saleId: saleIdRef.current });
+    if (countdownGuard.close()) {
+      logAction('save_cancel', { saleId: saleIdRef.current });
+    }
     closeSaveCountdown();
-  }, [closeSaveCountdown]);
+  }, [closeSaveCountdown, countdownGuard]);
 
   const startSaveCountdown = useCallback(() => {
     logAction('save_open', { totalAmount: pendingTotal });
+    countdownGuard.open();
     setCountdown(5);
     setSaveOpen(true);
-  }, [pendingTotal]);
+  }, [pendingTotal, countdownGuard]);
 
   const handleSave = useCallback(() => {
     if (!employee) return;
@@ -231,5 +240,5 @@ export function useSaveFlow({
     };
   }, [scannedProducts, saveOpen, resetOpen, unknownOpen, editProduct, historyOpen]);
 
-  return { saveOpen, countdown, handleSave, cancelSave, doSave };
+  return { saveOpen, countdown, handleSave, cancelSave, closeSaveCountdown, doSave };
 }
