@@ -13,6 +13,11 @@ import {
   Flex,
   Separator,
 } from '@chakra-ui/react';
+import {
+  flushActionLog,
+  logAction,
+  logActionOnce,
+} from '@/lib/client/action-log.client';
 import { useCart } from '../tab/[cardNumber]/hooks/useCart';
 import { useCashSaveFlow } from './hooks/useCashSaveFlow';
 import { CashConfirmModal } from './components/CashConfirmModal';
@@ -40,6 +45,13 @@ export default function CashPage() {
     unknownOpen,
     editProduct,
   });
+
+  // Cash has no login, but it is still a distinct visit. The session itself is
+  // started by whoever navigates here, not by this effect: startSession() mints
+  // a new id, and an effect can run twice, which would split the visit in two.
+  useEffect(() => {
+    logActionOnce('cash_open', 'cash_open', {});
+  }, []);
 
   // Keep scanner input focused when no modal is open
   useEffect(() => {
@@ -140,7 +152,7 @@ export default function CashPage() {
             )}
             {cart.scannedProducts.map((p) => (
               <Flex
-                key={p.barcode}
+                key={p.lineId}
                 w="full"
                 py={2}
                 px={4}
@@ -235,7 +247,15 @@ export default function CashPage() {
               py={6}
               variant="outline"
               colorPalette="red"
-              onClick={() => router.push('/')}
+              onClick={() => {
+                logAction('disconnect', {
+                  reason: 'user_cancel',
+                  mode: 'cash',
+                  lines: cart.scannedProducts.length,
+                  totalAmount: cart.pendingTotal,
+                });
+                flushActionLog().finally(() => router.push('/'));
+              }}
               disabled={loading}
               fontWeight="600"
               fontSize={{ base: 'lg', md: 'xl' }}
@@ -252,7 +272,7 @@ export default function CashPage() {
         pendingTotal={cart.pendingTotal}
         onCancel={save.cancelSave}
         onConfirm={() => {
-          save.cancelSave();
+          save.closeSaveCountdown();
           save.doSave();
         }}
       />
@@ -269,19 +289,34 @@ export default function CashPage() {
         onOpenChange={(open) => { if (!open) setEditProduct(null); }}
         onDelete={() => {
           if (!editProduct) return;
+          logAction('remove_item', {
+            mode: 'cash',
+            barcode: editProduct.barcode,
+            name: editProduct.name,
+            qty: editProduct.qty,
+            price: editProduct.price,
+          });
           cart.setPendingTotal((prev) => prev - editProduct.qty * editProduct.price);
           cart.setScannedProducts((prev) =>
-            prev.filter((p) => p.barcode !== editProduct.barcode)
+            prev.filter((p) => p.lineId !== editProduct.lineId)
           );
           setEditProduct(null);
         }}
         onConfirm={(newQty) => {
           if (!editProduct) return;
           const delta = newQty - editProduct.qty;
+          logAction('modify_item', {
+            mode: 'cash',
+            barcode: editProduct.barcode,
+            name: editProduct.name,
+            fromQty: editProduct.qty,
+            toQty: newQty,
+            price: editProduct.price,
+          });
           cart.setPendingTotal((prev) => prev + delta * editProduct.price);
           cart.setScannedProducts((prev) =>
             prev.map((p) =>
-              p.barcode === editProduct.barcode ? { ...p, qty: newQty } : p
+              p.lineId === editProduct.lineId ? { ...p, qty: newQty } : p
             )
           );
           setEditProduct(null);

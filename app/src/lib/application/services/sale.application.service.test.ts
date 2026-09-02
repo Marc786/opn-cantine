@@ -5,6 +5,7 @@ import { transactionRepository } from '@/lib/infrastructure/repositories/transac
 import { employeeRepository } from '@/lib/infrastructure/repositories/employee.repository.mongo';
 import { productRepository } from '@/lib/infrastructure/repositories/product.repository.mongo';
 import { TransactionItem } from '@/lib/domain/entities/transaction.entity';
+import { CASH_CARD_NUMBER } from '@/lib/domain/constants';
 import {
   startTestDb,
   stopTestDb,
@@ -265,5 +266,55 @@ describe('reconciliation under load', () => {
 
     const expectedTab = carts.reduce((sum, cart) => sum + cart.total, 0);
     expect(await readTab(CARD)).toBeCloseTo(expectedTab, 6);
+  });
+});
+
+describe('cash sales', () => {
+  const cash = (items: TransactionItem[], total: number, saleId = randomUUID()) =>
+    service.recordSale(saleId, CASH_CARD_NUMBER, items, total);
+
+  it('decrements stock even though no employee owns the sale', async () => {
+    // The bug this guards: cash used to post to /api/transactions, which
+    // records the sale but never touches stock — silent inventory drift.
+    const result = await cash(
+      [line({ barcode: 'b-chips', name: 'Chips', price: 2, quantity: 3, productId: 'p-chips' })],
+      6
+    );
+
+    expect(result.issues).toEqual([]);
+    expect(await readQuantity('p-chips')).toBe(7);
+    expect(await countTransactions()).toBe(1);
+  });
+
+  it('charges no tab and reports no employee', async () => {
+    const result = await cash([line({ barcode: 'b-soda', price: 3, productId: 'p-soda' })], 3);
+
+    expect(result.employee).toBeNull();
+    expect(result.transaction.tabApplied).toBe(false);
+  });
+
+  it('does not need a seeded employee for the cash card', async () => {
+    await expect(
+      cash([line({ barcode: 'b-chips', price: 2, productId: 'p-chips' })], 2)
+    ).resolves.toBeDefined();
+  });
+
+  it('applies stock exactly once when a cash sale is retried', async () => {
+    const saleId = randomUUID();
+    const items = [line({ barcode: 'b-chips', price: 2, quantity: 2, productId: 'p-chips' })];
+
+    await cash(items, 4, saleId);
+    const replay = await cash(items, 4, saleId);
+
+    expect(replay.replayed).toBe(true);
+    expect(await readQuantity('p-chips')).toBe(8);
+    expect(await countTransactions()).toBe(1);
+    expect(await unitsRemovedPerProduct()).toEqual({ 'p-chips': 2 });
+  });
+
+  it('still refuses an unknown employee card', async () => {
+    await expect(
+      service.recordSale(randomUUID(), 'nobody', [line({ barcode: 'b-chips' })], 1)
+    ).rejects.toBeInstanceOf(EmployeeNotFoundError);
   });
 });

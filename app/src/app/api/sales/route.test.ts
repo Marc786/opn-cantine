@@ -11,6 +11,7 @@ import {
   countTransactions,
 } from '@/test/db';
 import { POST } from './route';
+import { CASH_CARD_NUMBER } from '@/lib/domain/constants';
 
 const CARD = '000000000000';
 
@@ -122,5 +123,48 @@ describe('POST /api/sales total validation', () => {
 
     expect(status).toBe(400);
     expect(await readTab(CARD)).toBe(0);
+  });
+});
+
+describe('POST /api/sales for a cash payment', () => {
+  it('records the sale and decrements stock with no admin session', async () => {
+    // The kiosk has no admin cookie. Cash previously posted to
+    // /api/transactions, which demands one — so every cash sale 401'd and was
+    // dropped silently, and the stock was never decremented either way.
+    const { status, body } = await postSale({
+      saleId: 'cash-sale-0001',
+      cardNumber: CASH_CARD_NUMBER,
+      totalAmount: 5,
+      items: [chips(2)],
+    });
+
+    expect(status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.employee).toBeNull();
+    expect(await readQuantity('p1')).toBe(8);
+    expect(await countTransactions()).toBe(1);
+  });
+
+  it('leaves every employee tab untouched', async () => {
+    await postSale({
+      saleId: 'cash-sale-0002',
+      cardNumber: CASH_CARD_NUMBER,
+      totalAmount: 2.5,
+      items: [chips(1)],
+    });
+
+    expect(await readTab(CARD)).toBe(0);
+  });
+
+  it('still rejects a cash total that disagrees with its items', async () => {
+    const { status } = await postSale({
+      saleId: 'cash-sale-0003',
+      cardNumber: CASH_CARD_NUMBER,
+      totalAmount: 99,
+      items: [chips(1)],
+    });
+
+    expect(status).toBe(400);
+    expect(await readQuantity('p1')).toBe(10);
   });
 });

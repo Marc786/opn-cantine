@@ -180,6 +180,36 @@ describe('logActionOnce', () => {
     expect(new Set(entries.map((e) => e.sessionId)).size).toBe(2);
   });
 
+  it('is defeated when a new session starts between the calls', async () => {
+    const { client, store } = await freshModules();
+
+    // This is why /cash starts its session at the navigation point rather than
+    // in its mount effect: startSession() mints a new id, which is a new dedupe
+    // namespace. A StrictMode double effect would log twice *and* split one
+    // visit across two session ids.
+    for (let i = 0; i < 2; i++) {
+      client.startSession();
+      client.logActionOnce('cash_open', 'cash_open');
+    }
+    await client.flushActionLog();
+
+    const entries = await store.readAll();
+    expect(entries).toHaveLength(2);
+    expect(new Set(entries.map((e) => e.sessionId)).size).toBe(2);
+  });
+
+  it('records one cash_open per visit when the session starts before mount', async () => {
+    const { client, store } = await freshModules();
+
+    client.startSession();
+    for (let i = 0; i < 2; i++) client.logActionOnce('cash_open', 'cash_open');
+    await client.flushActionLog();
+
+    const entries = await store.readAll();
+    expect(entries.filter((e) => e.type === 'cash_open')).toHaveLength(1);
+    expect(new Set(entries.map((e) => e.sessionId)).size).toBe(1);
+  });
+
   it('does not suppress ordinary logAction calls of the same type', async () => {
     const { client, store } = await freshModules();
 

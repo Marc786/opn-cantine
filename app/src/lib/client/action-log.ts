@@ -9,6 +9,7 @@
 
 export type ActionType =
   | 'login'
+  | 'cash_open'
   | 'scan'
   | 'scan_unknown'
   | 'quick_add'

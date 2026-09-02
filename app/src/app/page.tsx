@@ -399,7 +399,10 @@ export default function Home() {
           <Button
             variant="outline"
             size="lg"
-            onClick={() => router.push('/cash')}
+            onClick={() => {
+              startSession();
+              router.push('/cash');
+            }}
           >
             Payer comptant
           </Button>

@@ -139,6 +139,16 @@ Two rules keep inventory and transactions in sync:
   leaves a negative quantity, which surfaces as a `warnings` entry and a restock
   to do, instead of silently absorbing the difference.
 
+### Cash payments
+
+Cash sales (`/cash`) use the same endpoint with the sentinel card `_cash_`.
+They write a ledger row and decrement stock exactly as a tab sale does, but
+charge no tab, so `employee` comes back `null` and `tabApplied` is `false`.
+
+They must not be routed to `POST /api/transactions`: that path is an admin-only
+backfill which deliberately touches neither the tab nor stock, so recording a
+cash sale there sells the item without ever decrementing it — silent drift.
+
 The response reports `issues` (sold but stock did not move — this should always
 be empty) and `warnings` (applied, but stock is now negative). Both are logged
 server-side, and each transaction stores its per-product `inventory` outcome so
@@ -183,6 +193,15 @@ Actions fired from a React effect must use `logActionOnce(key, type, detail)`:
 StrictMode invokes effects twice in development, and effects re-run whenever
 their dependencies change, so `logAction` alone would record duplicates. The
 key is namespaced by session id, so the next login records again on its own.
+
+For the same reason `startSession()` is always called at the point that
+navigates to a kiosk screen, never in that screen's mount effect: it mints a
+new id, so an effect running twice would both duplicate the entry and split one
+visit across two session ids.
+
+Cash payments share these types and carry `mode: 'cash'`, so a cash visit can
+be told apart from a tab visit with a plain `grep`. A cash visit opens with
+`cash_open` rather than `login`, since nobody identifies themselves.
 
 > Storage is per-origin and sandboxed: the file cannot be picked up off the
 > device's filesystem, the app has to hand it over. Clearing site data or
