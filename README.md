@@ -139,6 +139,18 @@ Two rules keep inventory and transactions in sync:
   leaves a negative quantity, which surfaces as a `warnings` entry and a restock
   to do, instead of silently absorbing the difference.
 
+### Price check
+
+`/price` is a read-only lookup reached from the home screen: scan an item, see
+its price, nothing is billed and no account is involved. It returns to the home
+screen after 45 s idle so the next person does not find a stranger's lookup.
+
+Every screen that reads a barcode shares `useBarcodeScanner`, so the tab, the
+cash register and the price check agree on what counts as a scan. The scanner
+has no Enter key on some models, which is why a burst of keystrokes faster than
+a human can type is submitted on its own after a short pause; those thresholds
+live in `lib/client/barcode-scan.ts` and are unit tested.
+
 ### Cash payments
 
 Cash sales (`/cash`) use the same endpoint with the sentinel card `_cash_`.

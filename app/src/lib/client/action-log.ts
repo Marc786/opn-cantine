@@ -12,6 +12,7 @@ export type ActionType =
   | 'cash_open'
   | 'scan'
   | 'scan_unknown'
+  | 'price_check'
   | 'quick_add'
   | 'modify_item'
   | 'remove_item'

@@ -394,7 +394,7 @@ export default function Home() {
             Paiement comptant
           </Text>
           <Text color="fg.muted" fontSize={{ base: 'sm', md: 'md' }} maxW="360px">
-            Payer directement contant - aucun compte requis
+            Payer directement comptant - aucun compte requis
           </Text>
           <Button
             variant="outline"
@@ -408,6 +408,20 @@ export default function Home() {
           </Button>
         </VStack>
       </Flex>
+
+      {/* Price check sits below the two panes rather than beside them: it is a
+          lookup, not a way to pay, and putting it in the row would read as a
+          third payment method. */}
+      <Button
+        variant="outline"
+        size="lg"
+        onClick={() => {
+          startSession();
+          router.push('/price');
+        }}
+      >
+        Vérifier un prix
+      </Button>
 
       <Button
         variant="ghost"
