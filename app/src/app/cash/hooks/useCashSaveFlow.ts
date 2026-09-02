@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { CASH_CARD_NUMBER } from '@/lib/domain/constants';
 import { flushActionLog, logAction } from '@/lib/client/action-log.client';
+import { createCountdownGuard } from '@/lib/client/countdown-guard';
 import type { ScannedProduct } from '../../tab/[cardNumber]/types';
 
 const INACTIVITY_TIMEOUT_MS = 15000;
@@ -48,6 +49,7 @@ export function useCashSaveFlow({
   const handleSaveRef = useRef<() => void>(() => {});
   const savingRef = useRef(false);
   const saleIdRef = useRef<string | null>(null);
+  const countdownGuard = useRef(createCountdownGuard()).current;
 
   const doSave = useCallback(async () => {
     if (pendingTotal === 0 || scannedProducts.length === 0) {
@@ -162,24 +164,31 @@ export function useCashSaveFlow({
   // confirm paths use this too, so it must not be recorded as a user
   // cancelling — otherwise every confirmed payment logs a cancel first.
   const closeSaveCountdown = useCallback(() => {
+    countdownGuard.close();
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
     setSaveOpen(false);
     setCountdown(COUNTDOWN_SECONDS);
-  }, []);
+  }, [countdownGuard]);
 
+  // Only the call that closes a *running* countdown is a cancellation. The
+  // dialog reports a dismissal from both its button and its onOpenChange, and
+  // it also closes on confirm and on auto-fire; the guard keeps those silent.
   const cancelSave = useCallback(() => {
-    logAction('save_cancel', { mode: 'cash', totalAmount: pendingTotal });
+    if (countdownGuard.close()) {
+      logAction('save_cancel', { mode: 'cash', totalAmount: pendingTotal });
+    }
     closeSaveCountdown();
-  }, [closeSaveCountdown, pendingTotal]);
+  }, [closeSaveCountdown, pendingTotal, countdownGuard]);
 
   const startSaveCountdown = useCallback(() => {
     logAction('save_open', { mode: 'cash', totalAmount: pendingTotal });
+    countdownGuard.open();
     setCountdown(COUNTDOWN_SECONDS);
     setSaveOpen(true);
-  }, [pendingTotal]);
+  }, [pendingTotal, countdownGuard]);
 
   const handleSave = useCallback(() => {
     if (pendingTotal === 0 || scannedProducts.length === 0) {
