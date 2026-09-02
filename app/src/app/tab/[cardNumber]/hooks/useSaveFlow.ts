@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Employee, ScannedProduct } from '../types';
+import { flushActionLog, logAction } from '@/lib/client/action-log.client';
 
 const INACTIVITY_TIMEOUT_MS = 15000;
 const SAVE_ATTEMPTS = 3;
@@ -62,6 +63,14 @@ export function useSaveFlow({
     if (!saleIdRef.current) saleIdRef.current = newSaleId();
     const saleId = saleIdRef.current;
 
+    logAction('save_confirm', {
+      saleId,
+      cardNumber,
+      totalAmount: pendingTotal,
+      lines: scannedProducts.length,
+      units: scannedProducts.reduce((sum, p) => sum + p.qty, 0),
+    });
+
     setLoading(true);
     try {
       const payload = JSON.stringify({
@@ -89,14 +98,25 @@ export function useSaveFlow({
           });
 
           if (res.ok) {
+            logAction('save_result', { saleId, outcome: 'ok', attempt: attempt + 1 });
             saleIdRef.current = null;
+            // The log is the only record of what the kiosk did; make sure it
+            // has landed before this screen goes away.
+            await flushActionLog();
             router.push('/');
             return;
           }
 
           // A rejected payload will never succeed; retrying only delays the user.
           if (res.status >= 400 && res.status < 500) {
+            logAction('save_error', {
+              saleId,
+              outcome: 'rejected',
+              status: res.status,
+              attempt: attempt + 1,
+            });
             console.error(`Sale rejected (${res.status}) for card ${cardNumber}`);
+            await flushActionLog();
             return;
           }
           lastError = new Error(`Sale failed with status ${res.status}`);
@@ -109,14 +129,23 @@ export function useSaveFlow({
         }
       }
 
+      logAction('save_error', {
+        saleId,
+        outcome: 'exhausted',
+        attempts: SAVE_ATTEMPTS,
+        message: lastError instanceof Error ? lastError.message : String(lastError),
+      });
       console.error(`Sale ${saleId} could not be recorded`, lastError);
+      await flushActionLog();
     } finally {
       setLoading(false);
       savingRef.current = false;
     }
   }, [employee, cardNumber, pendingTotal, scannedProducts, setLoading, router]);
 
-  const cancelSave = useCallback(() => {
+  // Tears the countdown down without judging why. The auto-fire path uses this
+  // too, so it must not be recorded as a user cancelling.
+  const closeSaveCountdown = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -125,15 +154,22 @@ export function useSaveFlow({
     setCountdown(5);
   }, []);
 
+  const cancelSave = useCallback(() => {
+    logAction('save_cancel', { saleId: saleIdRef.current });
+    closeSaveCountdown();
+  }, [closeSaveCountdown]);
+
   const startSaveCountdown = useCallback(() => {
+    logAction('save_open', { totalAmount: pendingTotal });
     setCountdown(5);
     setSaveOpen(true);
-  }, []);
+  }, [pendingTotal]);
 
   const handleSave = useCallback(() => {
     if (!employee) return;
     if (pendingTotal === 0) {
-      router.push('/');
+      logAction('disconnect', { reason: 'empty_cart' });
+      flushActionLog().finally(() => router.push('/'));
       return;
     }
     startSaveCountdown();
@@ -168,10 +204,10 @@ export function useSaveFlow({
   // Trigger save when countdown reaches 0
   useEffect(() => {
     if (countdown <= 0 && saveOpen) {
-      cancelSave();
+      closeSaveCountdown();
       doSaveRef.current();
     }
-  }, [countdown, saveOpen, cancelSave]);
+  }, [countdown, saveOpen, closeSaveCountdown]);
 
   // Auto-save after 15 s of no new scan; paused while any modal is open
   useEffect(() => {
@@ -180,6 +216,10 @@ export function useSaveFlow({
     if (saveOpen || resetOpen || unknownOpen || editProduct || historyOpen) return;
 
     inactivityTimerRef.current = setTimeout(() => {
+      logAction('auto_logout', {
+        afterMs: INACTIVITY_TIMEOUT_MS,
+        lines: scannedProducts.length,
+      });
       handleSaveRef.current();
     }, INACTIVITY_TIMEOUT_MS);
 
