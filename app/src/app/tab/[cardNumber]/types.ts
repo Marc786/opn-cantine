@@ -5,6 +5,11 @@ export interface Employee {
 }
 
 export interface ScannedProduct {
+  /**
+   * Identifies this cart line. Barcode is not enough: two different events
+   * share the `_event_` barcode while carrying their own name and price.
+   */
+  lineId: string;
   barcode: string;
   name: string;
   price: number;

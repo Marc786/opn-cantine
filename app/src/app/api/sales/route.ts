@@ -8,6 +8,7 @@ import { employeeRepository } from '@/lib/infrastructure/repositories/employee.r
 import { productRepository } from '@/lib/infrastructure/repositories/product.repository.mongo';
 import { TransactionItem } from '@/lib/domain/entities/transaction.entity';
 import { isValidSaleId } from '@/lib/domain/inventory-rules';
+import { cartTotal, totalMatchesItems } from '@/lib/domain/sale-totals';
 
 const service = new SaleApplicationService(
   transactionRepository,
@@ -64,6 +65,26 @@ export async function POST(request: NextRequest) {
     const parsedItems = parseItems(items);
     if (parsedItems === null) {
       return NextResponse.json({ error: 'Invalid items payload' }, { status: 400 });
+    }
+
+    // A total that disagrees with its own lines means the client is buggy, and
+    // we cannot tell which figure is right. Refusing is loud and costs one
+    // sale; accepting would mis-bill silently and forever.
+    if (!totalMatchesItems(totalAmount, parsedItems)) {
+      console.error('[sales] rejected sale whose total disagrees with its items', {
+        saleId,
+        cardNumber,
+        totalAmount,
+        itemsTotal: cartTotal(parsedItems),
+      });
+      return NextResponse.json(
+        {
+          error: 'totalAmount does not match the sum of items',
+          totalAmount,
+          itemsTotal: cartTotal(parsedItems),
+        },
+        { status: 400 }
+      );
     }
 
     const result = await service.recordSale(

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import type { ScannedProduct } from '../types';
+import { addUnit } from '../cart-lines';
 
 const RAPID_INPUT_THRESHOLD_MS = 80;
 const AUTO_SUBMIT_DELAY_MS = 300;
@@ -37,24 +38,14 @@ export function useCart(setUnknownOpen: (open: boolean) => void) {
         const product = data.product;
 
         setPendingTotal((prev) => prev + product.price);
-        setScannedProducts((prev) => {
-          const existing = prev.find((p) => p.barcode === value);
-          if (existing) {
-            return prev.map((p) =>
-              p.barcode === value ? { ...p, qty: p.qty + 1 } : p
-            );
-          }
-          return [
-            ...prev,
-            {
-              barcode: value,
-              name: product.name,
-              price: product.price,
-              qty: 1,
-              productId: product.id ?? null,
-            },
-          ];
-        });
+        setScannedProducts((prev) =>
+          addUnit(prev, {
+            barcode: value,
+            name: product.name,
+            price: product.price,
+            productId: product.id ?? null,
+          })
+        );
 
         setScanFeedback(`${product.name} — ${product.price.toFixed(2)}$`);
         setTimeout(() => setScanFeedback(''), 3000);
@@ -74,15 +65,9 @@ export function useCart(setUnknownOpen: (open: boolean) => void) {
     lastAddRef.current = now;
 
     setPendingTotal((prev) => prev + 1);
-    setScannedProducts((prev) => {
-      const existing = prev.find((p) => p.barcode === '_cafe_');
-      if (existing) {
-        return prev.map((p) =>
-          p.barcode === '_cafe_' ? { ...p, qty: p.qty + 1 } : p
-        );
-      }
-      return [...prev, { barcode: '_cafe_', name: 'Café', price: 1.0, qty: 1 }];
-    });
+    setScannedProducts((prev) =>
+      addUnit(prev, { barcode: '_cafe_', name: 'Café', price: 1.0 })
+    );
   };
 
   const addEvent = (name: string, price: number) => {
@@ -91,15 +76,7 @@ export function useCart(setUnknownOpen: (open: boolean) => void) {
     lastAddRef.current = now;
 
     setPendingTotal((prev) => prev + price);
-    setScannedProducts((prev) => {
-      const existing = prev.find((p) => p.barcode === '_event_');
-      if (existing) {
-        return prev.map((p) =>
-          p.barcode === '_event_' ? { ...p, qty: p.qty + 1 } : p
-        );
-      }
-      return [...prev, { barcode: '_event_', name, price, qty: 1 }];
-    });
+    setScannedProducts((prev) => addUnit(prev, { barcode: '_event_', name, price }));
   };
 
   const handleScanChange = (e: ChangeEvent<HTMLInputElement>) => {

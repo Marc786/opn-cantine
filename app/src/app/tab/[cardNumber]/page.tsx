@@ -262,7 +262,7 @@ export default function TabPage({
             )}
             {cart.scannedProducts.map((p) => (
               <Flex
-                key={p.barcode}
+                key={p.lineId}
                 w="full"
                 py={2}
                 px={4}
@@ -464,7 +464,7 @@ export default function TabPage({
           if (!editProduct) return;
           cart.setPendingTotal((prev) => prev - editProduct.qty * editProduct.price);
           cart.setScannedProducts((prev) =>
-            prev.filter((p) => p.barcode !== editProduct.barcode)
+            prev.filter((p) => p.lineId !== editProduct.lineId)
           );
           setEditProduct(null);
         }}
@@ -473,9 +473,7 @@ export default function TabPage({
           const delta = newQty - editProduct.qty;
           cart.setPendingTotal((prev) => prev + delta * editProduct.price);
           cart.setScannedProducts((prev) =>
-            prev.map((p) =>
-              p.barcode === editProduct.barcode ? { ...p, qty: newQty } : p
-            )
+            prev.map((p) => (p.lineId === editProduct.lineId ? { ...p, qty: newQty } : p))
           );
           setEditProduct(null);
         }}
