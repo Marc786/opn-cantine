@@ -175,6 +175,11 @@ Sale entries carry the `saleId`, which is the same id used as the transaction
 `_id` server-side — that is what lets a client trail be lined up against the
 ledger.
 
+Actions fired from a React effect must use `logActionOnce(key, type, detail)`:
+StrictMode invokes effects twice in development, and effects re-run whenever
+their dependencies change, so `logAction` alone would record duplicates. The
+key is namespaced by session id, so the next login records again on its own.
+
 > Storage is per-origin and sandboxed: the file cannot be picked up off the
 > device's filesystem, the app has to hand it over. Clearing site data or
 > browser eviction loses it.
