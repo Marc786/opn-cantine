@@ -13,14 +13,13 @@ afterEach(() => {
 const INACTIVITY_TIMEOUT_MS = 15000;
 
 const employee: Employee = {
-  id: 'e1',
-  name: 'Alice',
   cardNumber: '000000000001',
-  balance: 0,
-} as Employee;
+  employeeNumber: 'E1',
+  tab: 0,
+};
 
 const cart: ScannedProduct[] = [
-  { barcode: '1234', name: 'Chips', price: 2.5, quantity: 1, productId: 'p1' },
+  { lineId: 'l1', barcode: '1234', name: 'Chips', price: 2.5, qty: 1, productId: 'p1' },
 ];
 
 function mountSaveFlow(scanPending: boolean) {

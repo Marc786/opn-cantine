@@ -204,6 +204,18 @@ when the first response landed rather than the last.
 `scan` and `scan_unknown` entries record `durationMs`, so the journal can tell a
 slow scan apart from one that never arrived.
 
+The 15 s inactivity auto-logout is **paused while a lookup is in flight**. A
+pending scan means the operator is still standing there and an item is still on
+its way into the cart; saving at that moment would serialise the payload without
+it, and the article would leave the shelf unbilled — the
+[drift](#recording-a-sale) again. The delay starts over from full once the
+lookup lands, rather than resuming where it left off.
+
+That makes a stuck request dangerous in a new way: it would hold the session,
+and an employee's tab, on a shared screen indefinitely. So the lookup is bounded
+by a 10 s `AbortSignal.timeout`; a timeout is reported as `lookup_timeout` in
+the journal.
+
 ### Cash payments
 
 Cash sales (`/cash`) use the same endpoint with the sentinel card `_cash_`.
