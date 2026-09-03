@@ -28,6 +28,8 @@ interface Params {
   unknownOpen: boolean;
   editProduct: ScannedProduct | null;
   historyOpen: boolean;
+  /** True while a barcode lookup is in flight. */
+  scanPending: boolean;
 }
 
 export function useSaveFlow({
@@ -41,6 +43,7 @@ export function useSaveFlow({
   unknownOpen,
   editProduct,
   historyOpen,
+  scanPending,
 }: Params) {
   const [saveOpen, setSaveOpen] = useState(false);
   const [countdown, setCountdown] = useState(5);
@@ -224,11 +227,16 @@ export function useSaveFlow({
     }
   }, [countdown, saveOpen, closeSaveCountdown]);
 
-  // Auto-save after 15 s of no new scan; paused while any modal is open
+  // Auto-save after 15 s of no new scan; paused while any modal is open and
+  // while a lookup is in flight. A scan in flight means the operator is still
+  // there and an item is still on its way into the cart: saving now would
+  // serialise the payload without it, and the article would leave the shelf
+  // unbilled.
   useEffect(() => {
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
 
     if (saveOpen || resetOpen || unknownOpen || editProduct || historyOpen) return;
+    if (scanPending) return;
 
     inactivityTimerRef.current = setTimeout(() => {
       logAction('auto_logout', {
@@ -244,7 +252,15 @@ export function useSaveFlow({
         inactivityTimerRef.current = null;
       }
     };
-  }, [scannedProducts, saveOpen, resetOpen, unknownOpen, editProduct, historyOpen]);
+  }, [
+    scannedProducts,
+    saveOpen,
+    resetOpen,
+    unknownOpen,
+    editProduct,
+    historyOpen,
+    scanPending,
+  ]);
 
   return { saveOpen, saving, countdown, handleSave, cancelSave, closeSaveCountdown, doSave };
 }

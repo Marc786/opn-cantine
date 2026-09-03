@@ -52,6 +52,7 @@ export default function CashPage() {
     router,
     unknownOpen,
     editProduct,
+    scanPending: cart.scanPending,
   });
 
   const modalOpen = save.saveOpen || unknownOpen || editProduct !== null;

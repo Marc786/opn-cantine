@@ -193,6 +193,29 @@ out — taken off the shelf, never billed, never deducted: the same
 `saving`, and the cart turns those scans away with a message on screen and a
 `scan_dropped` entry rather than swallowing them.
 
+A scan is never instant, and on the device the lookup has been seen to take a
+couple of seconds. Nothing on screen said so, which reads exactly like a missed
+scan and invites the operator to scan again. The screens now show a spinner and
+"Recherche du produit…" while a lookup is in flight. It is driven by a *count*
+of outstanding lookups, not a flag: a scanner fires faster than the network
+answers, so overlapping lookups are normal and a flag would hide the spinner
+when the first response landed rather than the last.
+
+`scan` and `scan_unknown` entries record `durationMs`, so the journal can tell a
+slow scan apart from one that never arrived.
+
+The 15 s inactivity auto-logout is **paused while a lookup is in flight**. A
+pending scan means the operator is still standing there and an item is still on
+its way into the cart; saving at that moment would serialise the payload without
+it, and the article would leave the shelf unbilled — the
+[drift](#recording-a-sale) again. The delay starts over from full once the
+lookup lands, rather than resuming where it left off.
+
+That makes a stuck request dangerous in a new way: it would hold the session,
+and an employee's tab, on a shared screen indefinitely. So the lookup is bounded
+by a 10 s `AbortSignal.timeout`; a timeout is reported as `lookup_timeout` in
+the journal.
+
 ### Cash payments
 
 Cash sales (`/cash`) use the same endpoint with the sentinel card `_cash_`.
@@ -210,6 +233,19 @@ stock movements can be reconciled against the ledger at any time.
 
 Barcodes starting with `_` (`_cafe_`, `_event_`) are quick-add items: billed,
 but intentionally not inventory-tracked.
+
+### Sale screens
+
+The tab and cash screens are the same shape, and both fit one iPad screen: they
+are a fixed-height column (`100dvh`, `overflow: hidden`) where only the item
+list flexes, so the totals and the save button stay put and are never scrolled
+out of reach. The operator serves people standing at a counter; a control that
+has to be scrolled to is a control that gets missed.
+
+Scanned items render through the shared `ScannedItemList` so the list on the
+page and the recap in the confirmation dialog cannot drift apart. The recap
+passes no `onEdit` and is therefore inert: nothing inside the dialog can change
+the cart while the total sitting next to it says otherwise.
 
 ## Action log (on-device)
 
