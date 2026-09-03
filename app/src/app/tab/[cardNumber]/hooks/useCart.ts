@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { ScannedProduct } from '../types';
 import { addUnit } from '../cart-lines';
 import { logAction } from '@/lib/client/action-log.client';
@@ -14,10 +14,35 @@ export function useCart(
   const [scannedProducts, setScannedProducts] = useState<ScannedProduct[]>([]);
   const [pendingTotal, setPendingTotal] = useState(0);
   const [scanFeedback, setScanFeedback] = useState('');
+  // True while a barcode is being looked up. On the kiosk's connection that can
+  // take a couple of seconds, during which the screen used to show nothing at
+  // all and the operator could not tell a slow scan from a missed one.
+  const [scanPending, setScanPending] = useState(false);
 
   const lastAddRef = useRef(0);
+  const pendingLookupsRef = useRef(0);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSaleInProgressRef = useRef(isSaleInProgress);
   isSaleInProgressRef.current = isSaleInProgress;
+
+  // One timer for the whole screen. Two scans in quick succession each used to
+  // arm their own, so the first one to expire wiped the second one's message
+  // early.
+  const showFeedback = useCallback((message: string) => {
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    setScanFeedback(message);
+    feedbackTimerRef.current = setTimeout(() => {
+      setScanFeedback('');
+      feedbackTimerRef.current = null;
+    }, 3000);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    },
+    []
+  );
 
   const handleProductScan = useCallback(
     async (value: string) => {
@@ -26,19 +51,25 @@ export function useCart(
       // it away visibly rather than adding it to a cart that is already gone.
       if (isSaleInProgressRef.current?.()) {
         logAction('scan_dropped', { barcode: value, reason: 'sale_in_progress' });
-        setScanFeedback('Vente en cours — rescannez après');
-        setTimeout(() => setScanFeedback(''), 3000);
+        showFeedback('Vente en cours — rescannez après');
         return;
       }
+
+      // Counted, not a plain flag: scans can overlap, and the spinner must stay
+      // up until the last one lands rather than the first.
+      pendingLookupsRef.current += 1;
+      setScanPending(true);
+      const startedAt = Date.now();
 
       try {
         const res = await fetch(
           `/api/products/lookup?barcode=${encodeURIComponent(value)}`
         );
         const data = await res.json();
+        const durationMs = Date.now() - startedAt;
 
         if (!data.found) {
-          logAction('scan_unknown', { barcode: value });
+          logAction('scan_unknown', { barcode: value, durationMs });
           setUnknownOpen(true);
           return;
         }
@@ -55,22 +86,30 @@ export function useCart(
           })
         );
 
+        // Recorded so a slow scan can be told apart from a missed one when
+        // reading the journal after the fact.
         logAction('scan', {
           barcode: value,
           productId: product.id ?? null,
           name: product.name,
           price: product.price,
+          durationMs,
         });
 
-        setScanFeedback(`${product.name} — ${product.price.toFixed(2)}$`);
-        setTimeout(() => setScanFeedback(''), 3000);
+        showFeedback(`${product.name} — ${product.price.toFixed(2)}$`);
       } catch {
-        logAction('scan', { barcode: value, error: 'lookup_failed' });
-        setScanFeedback('Erreur de connexion');
-        setTimeout(() => setScanFeedback(''), 3000);
+        logAction('scan', {
+          barcode: value,
+          error: 'lookup_failed',
+          durationMs: Date.now() - startedAt,
+        });
+        showFeedback('Erreur de connexion');
+      } finally {
+        pendingLookupsRef.current -= 1;
+        if (pendingLookupsRef.current === 0) setScanPending(false);
       }
     },
-    [setUnknownOpen]
+    [setUnknownOpen, showFeedback]
   );
 
   const handleDroppedScan = useCallback((barcode: string) => {
@@ -113,6 +152,7 @@ export function useCart(
     pendingTotal,
     setPendingTotal,
     scanFeedback,
+    scanPending,
     scanValue,
     scanInputRef,
     addCoffee,
