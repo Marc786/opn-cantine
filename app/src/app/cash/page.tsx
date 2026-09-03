@@ -76,12 +76,20 @@ export default function CashPage() {
 
   return (
     <>
-      <Flex minH="100dvh" direction="column" px={8} py={6}>
+      <Flex
+        h="100dvh"
+        overflow="hidden"
+        direction="column"
+        px={8}
+        py={5}
+        gap={3}
+      >
         {/* Top bar */}
         <Heading
           size={{ base: '2xl', md: '4xl' }}
           fontWeight="800"
           letterSpacing="-0.02em"
+          flexShrink={0}
         >
           Paiement comptant
         </Heading>
@@ -104,8 +112,15 @@ export default function CashPage() {
           autoFocus
         />
 
-        {/* Fixed height container for scan feedback and products list */}
-        <Box minH="180px" w="full" position="relative" zIndex={10}>
+        {/* Takes whatever height is left over, so the cart grows into the
+            available space instead of pushing the page past the screen. */}
+        <Box
+          flex="1 1 auto"
+          minH="128px"
+          w="full"
+          position="relative"
+          zIndex={10}
+        >
           {/* Scan feedback */}
           <Box
             position="absolute"
@@ -134,14 +149,12 @@ export default function CashPage() {
             visibility={hasItems && !cart.scanFeedback ? 'visible' : 'hidden'}
             transition="all 0.2s"
             position="absolute"
-            top={0}
-            left={0}
-            right={0}
+            inset={0}
             zIndex={1}
           >
             <ScannedItemList
               items={cart.scannedProducts}
-              maxH="180px"
+              maxH="100%"
               onEdit={(item) => {
                 setEditProduct(item);
                 setEditQty(item.qty);
@@ -151,13 +164,19 @@ export default function CashPage() {
         </Box>
 
         {/* Main content */}
-        <Flex flex={1} direction="column" justify="center" gap={6} py={4}>
+        <Flex direction="column" gap={4} flexShrink={0}>
           {/* Total */}
-          <Box w="full" py={8} borderRadius="2xl" bg="bg.subtle" textAlign="center">
-            <Text fontSize={{ base: 'lg', md: 'xl' }} fontWeight="500" color="fg.muted" mb={3}>
+          <Box
+            w="full"
+            py={{ base: 5, md: 6 }}
+            borderRadius="2xl"
+            bg="bg.subtle"
+            textAlign="center"
+          >
+            <Text fontSize={{ base: 'lg', md: 'xl' }} fontWeight="500" color="fg.muted" mb={1}>
               Total à payer
             </Text>
-            <Text fontSize={{ base: '7xl', md: '9xl' }} fontWeight="800" lineHeight="1">
+            <Text fontSize={{ base: '7xl', md: '8xl' }} fontWeight="800" lineHeight="1">
               {cart.pendingTotal.toFixed(2)}$
             </Text>
           </Box>
@@ -165,7 +184,7 @@ export default function CashPage() {
           {/* Quick-add */}
           <Button
             h="auto"
-            py={6}
+            py={4}
             colorPalette="gray"
             variant="outline"
             onClick={cart.addCoffee}
@@ -183,7 +202,7 @@ export default function CashPage() {
             <Button
               flex={{ md: 3 }}
               h="auto"
-              py={6}
+              py={4}
               colorPalette="gray"
               onClick={save.handleSave}
               loading={loading}
@@ -196,7 +215,7 @@ export default function CashPage() {
             <Button
               flex={{ md: 1 }}
               h="auto"
-              py={6}
+              py={4}
               variant="outline"
               colorPalette="red"
               onClick={() => {
