@@ -110,3 +110,121 @@ describe('useCart while a sale is being sent', () => {
     expect(cart().scannedProducts).toHaveLength(1);
   });
 });
+
+/** A fetch whose response we release by hand, to observe the in-flight state. */
+function deferredFetch() {
+  const pending: Array<() => void> = [];
+  const fetchMock = vi.fn(
+    () =>
+      new Promise((resolve) => {
+        pending.push(() =>
+          resolve({
+            ok: true,
+            json: async () => ({
+              found: true,
+              product: { id: 'p1', name: 'Chips', price: 2.5 },
+            }),
+          })
+        );
+      })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  return {
+    releaseAll: () => pending.splice(0).forEach((r) => r()),
+    /** Releases the oldest in-flight lookup only. */
+    releaseOne: () => pending.shift()?.(),
+    inFlight: () => pending.length,
+  };
+}
+
+function scan(cart: () => ReturnType<typeof useCart>, barcode = '0064420001030') {
+  cart().handleScanChange({
+    target: { value: barcode },
+  } as React.ChangeEvent<HTMLInputElement>);
+  cart().handleScanKeyDown({ key: 'Enter' } as React.KeyboardEvent<HTMLInputElement>);
+}
+
+describe('useCart while a barcode is being looked up', () => {
+  it('reports the lookup as pending', async () => {
+    // On the kiosk this takes seconds, and the screen showed nothing at all
+    // meanwhile: a slow scan looked exactly like a missed one.
+    const { releaseAll } = deferredFetch();
+    const cart = mountCart();
+
+    await act(async () => { scan(cart); });
+    expect(cart().scanPending).toBe(true);
+
+    await act(async () => { releaseAll(); });
+    expect(cart().scanPending).toBe(false);
+  });
+
+  it('stays pending until the last of several scans lands', async () => {
+    // Overlapping scans are normal at speed. Clearing on the first response
+    // would drop the spinner while a lookup is still outstanding.
+    const { releaseOne, inFlight } = deferredFetch();
+    const cart = mountCart();
+
+    await act(async () => { scan(cart, '1111111111111'); });
+    await act(async () => { scan(cart, '2222222222222'); });
+    expect(inFlight()).toBe(2);
+
+    await act(async () => { releaseOne(); });
+    expect(cart().scanPending).toBe(true);
+
+    await act(async () => { releaseOne(); });
+    expect(cart().scanPending).toBe(false);
+  });
+
+  it('stops being pending when the lookup fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    const cart = mountCart();
+
+    await act(async () => { scan(cart); });
+
+    expect(cart().scanPending).toBe(false);
+    expect(cart().scanFeedback).toMatch(/Erreur/);
+  });
+
+  it('is not pending before anything is scanned', () => {
+    deferredFetch();
+    const cart = mountCart();
+
+    expect(cart().scanPending).toBe(false);
+  });
+});
+
+describe('useCart scan feedback', () => {
+  it('does not let an earlier scan cut short a later message', async () => {
+    // Each scan used to arm its own timer, so the first to expire wiped
+    // whatever the second had just put on screen.
+    vi.useFakeTimers();
+    try {
+      const cart = mountCart();
+      await act(async () => { scan(cart, '1111111111111'); });
+
+      await act(async () => { vi.advanceTimersByTime(2500); });
+      await act(async () => { scan(cart, '2222222222222'); });
+      // The first timer would have fired here.
+      await act(async () => { vi.advanceTimersByTime(1000); });
+
+      expect(cart().scanFeedback).toMatch(/Chips/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears the message once it has had its time', async () => {
+    vi.useFakeTimers();
+    try {
+      const cart = mountCart();
+      await act(async () => { scan(cart); });
+      expect(cart().scanFeedback).toMatch(/Chips/);
+
+      await act(async () => { vi.advanceTimersByTime(3100); });
+
+      expect(cart().scanFeedback).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

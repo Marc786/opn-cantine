@@ -10,6 +10,7 @@ import {
   Text,
   Input,
   HStack,
+  Spinner,
   Flex,
   Separator,
 } from '@chakra-ui/react';
@@ -237,7 +238,8 @@ export default function TabPage({
           position="relative"
           zIndex={10}
         >
-          {/* Scan feedback */}
+          {/* Scan feedback, and the lookup that precedes it. Sits above the
+              cart because it is the newest thing that happened. */}
           <Box
             position="absolute"
             top={0}
@@ -248,14 +250,17 @@ export default function TabPage({
             borderRadius="xl"
             bg="bg.subtle"
             textAlign="center"
-            opacity={cart.scanFeedback ? 1 : 0}
-            visibility={cart.scanFeedback ? 'visible' : 'hidden'}
+            opacity={cart.scanFeedback || cart.scanPending ? 1 : 0}
+            visibility={cart.scanFeedback || cart.scanPending ? 'visible' : 'hidden'}
             transition="all 0.2s"
             zIndex={2}
           >
-            <Text fontSize={{ base: 'md', md: 'lg' }} fontWeight="600">
-              {cart.scanFeedback || ' '}
-            </Text>
+            <HStack justify="center" gap={3}>
+              {cart.scanPending && <Spinner size="sm" borderWidth="3px" />}
+              <Text fontSize={{ base: 'md', md: 'lg' }} fontWeight="600">
+                {cart.scanPending ? 'Recherche du produit…' : cart.scanFeedback || ' '}
+              </Text>
+            </HStack>
           </Box>
 
           {/* Scanned products list */}
