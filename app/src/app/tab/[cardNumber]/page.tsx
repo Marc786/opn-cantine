@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useRef, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -13,6 +13,7 @@ import {
   Flex,
   Separator,
 } from '@chakra-ui/react';
+import { ScannedItemList } from '@/components/ScannedItemList';
 import { useCart } from './hooks/useCart';
 import { useSaveFlow } from './hooks/useSaveFlow';
 import { HistoryModal } from './components/HistoryModal';
@@ -84,7 +85,14 @@ export default function TabPage({
   const [editQty, setEditQty] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const cart = useCart(setUnknownOpen);
+  // Read at scan time rather than passed as a value: `save` is declared below,
+  // and the ref keeps the answer current without re-running effects.
+  const modalOpenRef = useRef(false);
+  const savingRef = useRef(false);
+  const cart = useCart(setUnknownOpen, {
+    isScannerEnabled: () => !modalOpenRef.current,
+    isSaleInProgress: () => savingRef.current,
+  });
 
   const save = useSaveFlow({
     employee,
@@ -98,6 +106,11 @@ export default function TabPage({
     editProduct,
     historyOpen,
   });
+
+  const modalOpen =
+    save.saveOpen || resetOpen || unknownOpen || editProduct !== null || historyOpen;
+  modalOpenRef.current = modalOpen;
+  savingRef.current = save.saving;
 
   useEffect(() => {
     const fetchEmployee = async () => {
@@ -151,13 +164,11 @@ export default function TabPage({
   // Keep scanner input focused when no modal is open
   useEffect(() => {
     const refocus = () => {
-      if (!save.saveOpen && !resetOpen && !unknownOpen && !editProduct && !historyOpen) {
-        cart.scanInputRef.current?.focus();
-      }
+      if (!modalOpen) cart.scanInputRef.current?.focus();
     };
     document.addEventListener('click', refocus);
     return () => document.removeEventListener('click', refocus);
-  }, [save.saveOpen, resetOpen, unknownOpen, editProduct, historyOpen, cart.scanInputRef]);
+  }, [modalOpen, cart.scanInputRef]);
 
   const hasPending = cart.pendingTotal !== 0;
   const projectedTab = employee ? employee.tab + cart.pendingTotal : 0;
@@ -168,9 +179,16 @@ export default function TabPage({
 
   return (
     <>
-      <Flex minH="100dvh" direction="column" px={8} py={6}>
+      <Flex
+        h="100dvh"
+        overflow="hidden"
+        direction="column"
+        px={8}
+        py={5}
+        gap={3}
+      >
         {/* Top bar */}
-        <Flex justify="space-between" align="center">
+        <Flex justify="space-between" align="center" flexShrink={0}>
           <VStack align="start" gap={0}>
             <Heading
               size={{ base: '2xl', md: '4xl' }}
@@ -197,9 +215,7 @@ export default function TabPage({
           ref={cart.scanInputRef}
           value={cart.scanValue}
           onBlur={() => {
-            if (!save.saveOpen && !resetOpen && !unknownOpen && !editProduct) {
-              cart.scanInputRef.current?.focus();
-            }
+            if (!modalOpen) cart.scanInputRef.current?.focus();
           }}
           onChange={cart.handleScanChange}
           onKeyDown={cart.handleScanKeyDown}
@@ -212,8 +228,15 @@ export default function TabPage({
           autoFocus
         />
 
-        {/* Fixed height container for scan feedback and products list */}
-        <Box minH="120px" w="full" position="relative" zIndex={10}>
+        {/* Takes whatever height is left over, so the cart grows into the
+            available space instead of pushing the page past the screen. */}
+        <Box
+          flex="1 1 auto"
+          minH="128px"
+          w="full"
+          position="relative"
+          zIndex={10}
+        >
           {/* Scan feedback */}
           <Box
             position="absolute"
@@ -236,92 +259,32 @@ export default function TabPage({
           </Box>
 
           {/* Scanned products list */}
-          <VStack
+          <Box
             w="full"
-            maxH="120px"
-            overflowY="auto"
-            gap={1}
-            align="stretch"
             opacity={cart.scannedProducts.length > 0 && !cart.scanFeedback ? 1 : 0}
-            visibility={
-              cart.scannedProducts.length > 0 && !cart.scanFeedback
-                ? 'visible'
-                : 'hidden'
-            }
+            visibility={cart.scannedProducts.length > 0 && !cart.scanFeedback ? 'visible' : 'hidden'}
             transition="all 0.2s"
             position="absolute"
-            top={0}
-            left={0}
-            right={0}
+            inset={0}
             zIndex={1}
-            css={{
-              '&::-webkit-scrollbar': { width: '4px' },
-              '&::-webkit-scrollbar-track': { background: 'transparent' },
-              '&::-webkit-scrollbar-thumb': {
-                background: 'var(--chakra-colors-border)',
-                borderRadius: '4px',
-              },
-            }}
           >
-            {cart.scannedProducts.length > 0 && (
-              <Text fontSize="xs" color="fg.muted" textAlign="center" pb={0.5}>
-                Touchez un article pour le modifier
-              </Text>
-            )}
-            {cart.scannedProducts.map((p) => (
-              <Flex
-                key={p.lineId}
-                w="full"
-                py={2}
-                px={4}
-                align="center"
-                justify="space-between"
-                borderRadius="lg"
-                borderWidth="1px"
-                borderColor="border"
-                bg="bg.subtle"
-                cursor="pointer"
-                transition="all 0.15s"
-                _hover={{ bg: 'bg.muted' }}
-                _active={{ bg: 'bg.muted', transform: 'scale(0.98)' }}
-                onClick={() => {
-                  setEditProduct(p);
-                  setEditQty(p.qty);
-                }}
-              >
-                <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight="700">
-                  {p.name} {p.qty > 1 ? `x${p.qty}` : ''}
-                </Text>
-                <HStack gap={2}>
-                  <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight="700">
-                    {(p.price * p.qty).toFixed(2)}$
-                  </Text>
-                  <Flex
-                    align="center"
-                    gap={1}
-                    px={2}
-                    py={0.5}
-                    borderRadius="full"
-                    bg="bg.muted"
-                    color="fg.muted"
-                    fontSize="xs"
-                    fontWeight="600"
-                    flexShrink={0}
-                  >
-                    ✎ Modifier
-                  </Flex>
-                </HStack>
-              </Flex>
-            ))}
-          </VStack>
+            <ScannedItemList
+              items={cart.scannedProducts}
+              maxH="100%"
+              onEdit={(item) => {
+                setEditProduct(item);
+                setEditQty(item.qty);
+              }}
+            />
+          </Box>
         </Box>
 
         {/* Main content */}
-        <Flex flex={1} direction="column" justify="center" gap={6} py={4}>
+        <Flex direction="column" gap={4} flexShrink={0}>
           {/* Balance */}
           <Box
             w="full"
-            py={8}
+            py={{ base: 5, md: 6 }}
             borderRadius="2xl"
             bg={balanceColor.bg}
             textAlign="center"
@@ -330,12 +293,12 @@ export default function TabPage({
               fontSize={{ base: 'lg', md: 'xl' }}
               fontWeight="500"
               color={balanceColor.fg}
-              mb={3}
+              mb={1}
             >
               {hasPending ? 'Aperçu du solde' : 'Solde actuel'}
             </Text>
             <Text
-              fontSize={{ base: '7xl', md: '9xl' }}
+              fontSize={{ base: '7xl', md: '8xl' }}
               fontWeight="800"
               lineHeight="1"
               color={balanceColor.fg}
@@ -346,7 +309,7 @@ export default function TabPage({
             <Text
               fontSize={{ base: 'md', md: 'lg' }}
               fontWeight="600"
-              mt={4}
+              mt={2}
               color={pendingColor.fg}
               visibility={hasPending ? 'visible' : 'hidden'}
             >
@@ -358,7 +321,7 @@ export default function TabPage({
               <Text
                 fontSize={{ base: 'sm', md: 'md' }}
                 fontWeight="600"
-                mt={4}
+                mt={2}
                 color="red.500"
               >
                 Votre solde dépasse 75$. Merci de payer votre dette.
@@ -371,7 +334,7 @@ export default function TabPage({
             <Button
               flex={1}
               h="auto"
-              py={6}
+              py={4}
               colorPalette="gray"
               variant="outline"
               onClick={cart.addCoffee}
@@ -385,7 +348,7 @@ export default function TabPage({
               <VStack flex={1} gap={1} align="stretch">
                 <Button
                   h="auto"
-                  py={6}
+                  py={4}
                   variant="outline"
                   borderColor="#0068A2"
                   color="#0068A2"
@@ -413,7 +376,7 @@ export default function TabPage({
             <Button
               flex={{ md: 3 }}
               h="auto"
-              py={6}
+              py={4}
               colorPalette="gray"
               onClick={save.handleSave}
               loading={loading}
@@ -425,7 +388,7 @@ export default function TabPage({
             <Button
               flex={{ md: 1 }}
               h="auto"
-              py={6}
+              py={4}
               variant="outline"
               colorPalette="red"
               onClick={() => setResetOpen(true)}
@@ -451,6 +414,7 @@ export default function TabPage({
         countdown={save.countdown}
         pendingTotal={cart.pendingTotal}
         projectedTab={projectedTab}
+        scannedProducts={cart.scannedProducts}
         onCancel={save.cancelSave}
         onSave={() => {
           save.closeSaveCountdown();

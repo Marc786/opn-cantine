@@ -61,6 +61,11 @@ Three layers, all under `src`:
 - `lib/application/services/sale.application.service.test.ts` — the drift
   invariants end to end, plus a randomised reconciliation test that replays
   concurrent carts and asserts stock, tab and ledger still agree.
+- `lib/client/useBarcodeScanner.test.tsx` — renders the hook against real DOM
+  events, including scans typed while the hidden input has lost focus.
+
+Suites that render React opt into jsdom with a `// @vitest-environment jsdom`
+docblock; everything else runs in Node, which keeps the rest fast.
 
 These exist to stop the [inventory drift](#recording-a-sale) bugs from coming
 back. If you change how sales are written, the reconciliation test is the one to
@@ -150,6 +155,43 @@ cash register and the price check agree on what counts as a scan. The scanner
 has no Enter key on some models, which is why a burst of keystrokes faster than
 a human can type is submitted on its own after a short pause; those thresholds
 live in `lib/client/barcode-scan.ts` and are unit tested.
+
+The scanner is a keyboard: it types into whatever holds focus. Anything that
+takes focus away — tapping "Café", dismissing a dialog — used to send the next
+scan nowhere, and because a partial or empty code is silently discarded the item
+simply never appeared, with nothing on screen and nothing in the journal to say
+why. Refocusing the input on click or on blur only helps once such an event
+happens, by which point the keystrokes are gone.
+
+So `useBarcodeScanner` also listens for keystrokes on the document. If a digit
+arrives while the hidden input is not focused, it pulls focus back and keeps the
+character. It stands down while a real field is focused, and while a dialog is
+open, so a quantity box keeps its own digits: pages pass `isScannerEnabled`, a
+predicate read at each keystroke rather than a flag, because the answer depends
+on hooks that run later in the component.
+
+The code being assembled is held in a ref as well as in React state, since the
+handlers must not depend on a re-render having happened: a scanner delivers a
+whole barcode in a few milliseconds. Codes too short to look up are reported as
+`scan_dropped` in the journal — their previous silence is what made this hard to
+diagnose. A misread that stops after a digit or two is cleared once the burst
+goes quiet, so it cannot prefix the next scan into a nonexistent barcode.
+
+### Slow connections
+
+A slow network widens two windows where a scan used to disappear.
+
+The screens render nothing until their first request comes back, so on a slow
+connection the hidden input does not exist yet. The document listener keeps
+those keystrokes anyway and submits them once the page is up.
+
+More seriously, the sale payload is serialised when the save starts, and the
+screen redirects home when it returns. With retries that gap can last seconds,
+and anything scanned inside it was added to a cart that was already on its way
+out — taken off the shelf, never billed, never deducted: the same
+[inventory drift](#recording-a-sale) by another route. The save flows now expose
+`saving`, and the cart turns those scans away with a message on screen and a
+`scan_dropped` entry rather than swallowing them.
 
 ### Cash payments
 

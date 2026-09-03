@@ -1,15 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
   Heading,
   Button,
-  VStack,
   Text,
   Input,
-  HStack,
   Flex,
   Separator,
 } from '@chakra-ui/react';
@@ -18,6 +16,7 @@ import {
   logAction,
   logActionOnce,
 } from '@/lib/client/action-log.client';
+import { ScannedItemList } from '@/components/ScannedItemList';
 import { useCart } from '../tab/[cardNumber]/hooks/useCart';
 import { useCashSaveFlow } from './hooks/useCashSaveFlow';
 import { CashConfirmModal } from './components/CashConfirmModal';
@@ -33,7 +32,14 @@ export default function CashPage() {
   const [editProduct, setEditProduct] = useState<ScannedProduct | null>(null);
   const [editQty, setEditQty] = useState(0);
 
-  const cart = useCart(setUnknownOpen);
+  // Read at scan time rather than passed as a value: `save` is declared below,
+  // and the ref keeps the answer current without re-running effects.
+  const modalOpenRef = useRef(false);
+  const savingRef = useRef(false);
+  const cart = useCart(setUnknownOpen, {
+    isScannerEnabled: () => !modalOpenRef.current,
+    isSaleInProgress: () => savingRef.current,
+  });
 
   const save = useCashSaveFlow({
     pendingTotal: cart.pendingTotal,
@@ -46,6 +52,10 @@ export default function CashPage() {
     editProduct,
   });
 
+  const modalOpen = save.saveOpen || unknownOpen || editProduct !== null;
+  modalOpenRef.current = modalOpen;
+  savingRef.current = save.saving;
+
   // Cash has no login, but it is still a distinct visit. The session itself is
   // started by whoever navigates here, not by this effect: startSession() mints
   // a new id, and an effect can run twice, which would split the visit in two.
@@ -56,24 +66,30 @@ export default function CashPage() {
   // Keep scanner input focused when no modal is open
   useEffect(() => {
     const refocus = () => {
-      if (!save.saveOpen && !unknownOpen && !editProduct) {
-        cart.scanInputRef.current?.focus();
-      }
+      if (!modalOpen) cart.scanInputRef.current?.focus();
     };
     document.addEventListener('click', refocus);
     return () => document.removeEventListener('click', refocus);
-  }, [save.saveOpen, unknownOpen, editProduct, cart.scanInputRef]);
+  }, [modalOpen, cart.scanInputRef]);
 
   const hasItems = cart.scannedProducts.length > 0;
 
   return (
     <>
-      <Flex minH="100dvh" direction="column" px={8} py={6}>
+      <Flex
+        h="100dvh"
+        overflow="hidden"
+        direction="column"
+        px={8}
+        py={5}
+        gap={3}
+      >
         {/* Top bar */}
         <Heading
           size={{ base: '2xl', md: '4xl' }}
           fontWeight="800"
           letterSpacing="-0.02em"
+          flexShrink={0}
         >
           Paiement comptant
         </Heading>
@@ -83,9 +99,7 @@ export default function CashPage() {
           ref={cart.scanInputRef}
           value={cart.scanValue}
           onBlur={() => {
-            if (!save.saveOpen && !unknownOpen && !editProduct) {
-              cart.scanInputRef.current?.focus();
-            }
+            if (!modalOpen) cart.scanInputRef.current?.focus();
           }}
           onChange={cart.handleScanChange}
           onKeyDown={cart.handleScanKeyDown}
@@ -98,8 +112,15 @@ export default function CashPage() {
           autoFocus
         />
 
-        {/* Fixed height container for scan feedback and products list */}
-        <Box minH="120px" w="full" position="relative" zIndex={10}>
+        {/* Takes whatever height is left over, so the cart grows into the
+            available space instead of pushing the page past the screen. */}
+        <Box
+          flex="1 1 auto"
+          minH="128px"
+          w="full"
+          position="relative"
+          zIndex={10}
+        >
           {/* Scan feedback */}
           <Box
             position="absolute"
@@ -122,90 +143,40 @@ export default function CashPage() {
           </Box>
 
           {/* Scanned products list */}
-          <VStack
+          <Box
             w="full"
-            maxH="120px"
-            overflowY="auto"
-            gap={1}
-            align="stretch"
             opacity={hasItems && !cart.scanFeedback ? 1 : 0}
             visibility={hasItems && !cart.scanFeedback ? 'visible' : 'hidden'}
             transition="all 0.2s"
             position="absolute"
-            top={0}
-            left={0}
-            right={0}
+            inset={0}
             zIndex={1}
-            css={{
-              '&::-webkit-scrollbar': { width: '4px' },
-              '&::-webkit-scrollbar-track': { background: 'transparent' },
-              '&::-webkit-scrollbar-thumb': {
-                background: 'var(--chakra-colors-border)',
-                borderRadius: '4px',
-              },
-            }}
           >
-            {hasItems && (
-              <Text fontSize="xs" color="fg.muted" textAlign="center" pb={0.5}>
-                Touchez un article pour le modifier
-              </Text>
-            )}
-            {cart.scannedProducts.map((p) => (
-              <Flex
-                key={p.lineId}
-                w="full"
-                py={2}
-                px={4}
-                align="center"
-                justify="space-between"
-                borderRadius="lg"
-                borderWidth="1px"
-                borderColor="border"
-                bg="bg.subtle"
-                cursor="pointer"
-                transition="all 0.15s"
-                _hover={{ bg: 'bg.muted' }}
-                _active={{ bg: 'bg.muted', transform: 'scale(0.98)' }}
-                onClick={() => {
-                  setEditProduct(p);
-                  setEditQty(p.qty);
-                }}
-              >
-                <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight="700">
-                  {p.name} {p.qty > 1 ? `x${p.qty}` : ''}
-                </Text>
-                <HStack gap={2}>
-                  <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight="700">
-                    {(p.price * p.qty).toFixed(2)}$
-                  </Text>
-                  <Flex
-                    align="center"
-                    gap={1}
-                    px={2}
-                    py={0.5}
-                    borderRadius="full"
-                    bg="bg.muted"
-                    color="fg.muted"
-                    fontSize="xs"
-                    fontWeight="600"
-                    flexShrink={0}
-                  >
-                    ✎ Modifier
-                  </Flex>
-                </HStack>
-              </Flex>
-            ))}
-          </VStack>
+            <ScannedItemList
+              items={cart.scannedProducts}
+              maxH="100%"
+              onEdit={(item) => {
+                setEditProduct(item);
+                setEditQty(item.qty);
+              }}
+            />
+          </Box>
         </Box>
 
         {/* Main content */}
-        <Flex flex={1} direction="column" justify="center" gap={6} py={4}>
+        <Flex direction="column" gap={4} flexShrink={0}>
           {/* Total */}
-          <Box w="full" py={8} borderRadius="2xl" bg="bg.subtle" textAlign="center">
-            <Text fontSize={{ base: 'lg', md: 'xl' }} fontWeight="500" color="fg.muted" mb={3}>
+          <Box
+            w="full"
+            py={{ base: 5, md: 6 }}
+            borderRadius="2xl"
+            bg="bg.subtle"
+            textAlign="center"
+          >
+            <Text fontSize={{ base: 'lg', md: 'xl' }} fontWeight="500" color="fg.muted" mb={1}>
               Total à payer
             </Text>
-            <Text fontSize={{ base: '7xl', md: '9xl' }} fontWeight="800" lineHeight="1">
+            <Text fontSize={{ base: '7xl', md: '8xl' }} fontWeight="800" lineHeight="1">
               {cart.pendingTotal.toFixed(2)}$
             </Text>
           </Box>
@@ -213,7 +184,7 @@ export default function CashPage() {
           {/* Quick-add */}
           <Button
             h="auto"
-            py={6}
+            py={4}
             colorPalette="gray"
             variant="outline"
             onClick={cart.addCoffee}
@@ -231,7 +202,7 @@ export default function CashPage() {
             <Button
               flex={{ md: 3 }}
               h="auto"
-              py={6}
+              py={4}
               colorPalette="gray"
               onClick={save.handleSave}
               loading={loading}
@@ -244,7 +215,7 @@ export default function CashPage() {
             <Button
               flex={{ md: 1 }}
               h="auto"
-              py={6}
+              py={4}
               variant="outline"
               colorPalette="red"
               onClick={() => {
@@ -270,6 +241,7 @@ export default function CashPage() {
         open={save.saveOpen}
         countdown={save.countdown}
         pendingTotal={cart.pendingTotal}
+        scannedProducts={cart.scannedProducts}
         onCancel={save.cancelSave}
         onConfirm={() => {
           save.closeSaveCountdown();

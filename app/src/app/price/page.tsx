@@ -55,7 +55,10 @@ export default function PricePage() {
     }
   }, []);
 
-  const scanner = useBarcodeScanner(lookUp);
+  const scanner = useBarcodeScanner(lookUp, {
+    onDropped: (barcode) =>
+      logAction('scan_dropped', { barcode, length: barcode.length, mode: 'price_check' }),
+  });
 
   // Send the kiosk home once it has been left alone, so the next person finds
   // the login screen rather than a stranger's last lookup.
