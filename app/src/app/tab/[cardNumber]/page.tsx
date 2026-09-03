@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useRef, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -84,7 +84,14 @@ export default function TabPage({
   const [editQty, setEditQty] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const cart = useCart(setUnknownOpen);
+  // Read at scan time rather than passed as a value: `save` is declared below,
+  // and the ref keeps the answer current without re-running effects.
+  const modalOpenRef = useRef(false);
+  const savingRef = useRef(false);
+  const cart = useCart(setUnknownOpen, {
+    isScannerEnabled: () => !modalOpenRef.current,
+    isSaleInProgress: () => savingRef.current,
+  });
 
   const save = useSaveFlow({
     employee,
@@ -98,6 +105,11 @@ export default function TabPage({
     editProduct,
     historyOpen,
   });
+
+  const modalOpen =
+    save.saveOpen || resetOpen || unknownOpen || editProduct !== null || historyOpen;
+  modalOpenRef.current = modalOpen;
+  savingRef.current = save.saving;
 
   useEffect(() => {
     const fetchEmployee = async () => {
@@ -151,13 +163,11 @@ export default function TabPage({
   // Keep scanner input focused when no modal is open
   useEffect(() => {
     const refocus = () => {
-      if (!save.saveOpen && !resetOpen && !unknownOpen && !editProduct && !historyOpen) {
-        cart.scanInputRef.current?.focus();
-      }
+      if (!modalOpen) cart.scanInputRef.current?.focus();
     };
     document.addEventListener('click', refocus);
     return () => document.removeEventListener('click', refocus);
-  }, [save.saveOpen, resetOpen, unknownOpen, editProduct, historyOpen, cart.scanInputRef]);
+  }, [modalOpen, cart.scanInputRef]);
 
   const hasPending = cart.pendingTotal !== 0;
   const projectedTab = employee ? employee.tab + cart.pendingTotal : 0;
@@ -197,9 +207,7 @@ export default function TabPage({
           ref={cart.scanInputRef}
           value={cart.scanValue}
           onBlur={() => {
-            if (!save.saveOpen && !resetOpen && !unknownOpen && !editProduct) {
-              cart.scanInputRef.current?.focus();
-            }
+            if (!modalOpen) cart.scanInputRef.current?.focus();
           }}
           onChange={cart.handleScanChange}
           onKeyDown={cart.handleScanKeyDown}

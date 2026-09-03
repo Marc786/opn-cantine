@@ -4,15 +4,33 @@ import { addUnit } from '../cart-lines';
 import { logAction } from '@/lib/client/action-log.client';
 import { useBarcodeScanner } from '@/lib/client/useBarcodeScanner';
 
-export function useCart(setUnknownOpen: (open: boolean) => void) {
+export function useCart(
+  setUnknownOpen: (open: boolean) => void,
+  {
+    isScannerEnabled,
+    isSaleInProgress,
+  }: { isScannerEnabled?: () => boolean; isSaleInProgress?: () => boolean } = {}
+) {
   const [scannedProducts, setScannedProducts] = useState<ScannedProduct[]>([]);
   const [pendingTotal, setPendingTotal] = useState(0);
   const [scanFeedback, setScanFeedback] = useState('');
 
   const lastAddRef = useRef(0);
+  const isSaleInProgressRef = useRef(isSaleInProgress);
+  isSaleInProgressRef.current = isSaleInProgress;
 
   const handleProductScan = useCallback(
     async (value: string) => {
+      // The sale payload is built when the save starts, so an item scanned
+      // after that point would leave the shelf without ever being billed. Turn
+      // it away visibly rather than adding it to a cart that is already gone.
+      if (isSaleInProgressRef.current?.()) {
+        logAction('scan_dropped', { barcode: value, reason: 'sale_in_progress' });
+        setScanFeedback('Vente en cours — rescannez après');
+        setTimeout(() => setScanFeedback(''), 3000);
+        return;
+      }
+
       try {
         const res = await fetch(
           `/api/products/lookup?barcode=${encodeURIComponent(value)}`
@@ -55,8 +73,17 @@ export function useCart(setUnknownOpen: (open: boolean) => void) {
     [setUnknownOpen]
   );
 
+  const handleDroppedScan = useCallback((barcode: string) => {
+    // Too short to be a product. Nothing is shown on screen, so record it:
+    // an unexplained gap in the journal is what made this hard to diagnose.
+    logAction('scan_dropped', { barcode, length: barcode.length });
+  }, []);
+
   const { scanValue, scanInputRef, handleScanChange, handleScanKeyDown } =
-    useBarcodeScanner(handleProductScan);
+    useBarcodeScanner(handleProductScan, {
+      isEnabled: isScannerEnabled,
+      onDropped: handleDroppedScan,
+    });
 
   const addCoffee = () => {
     const now = Date.now();

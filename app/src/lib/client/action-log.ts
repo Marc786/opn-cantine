@@ -11,6 +11,7 @@ export type ActionType =
   | 'login'
   | 'cash_open'
   | 'scan'
+  | 'scan_dropped'
   | 'scan_unknown'
   | 'price_check'
   | 'quick_add'

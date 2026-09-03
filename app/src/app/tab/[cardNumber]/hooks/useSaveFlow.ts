@@ -50,6 +50,10 @@ export function useSaveFlow({
   const doSaveRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const handleSaveRef = useRef<() => void>(() => {});
   const savingRef = useRef(false);
+  // Mirrored into state so the page can stop taking scans while the sale is in
+  // flight. The payload is serialised once, up front: anything scanned after
+  // that would be carried off by the redirect without ever being billed.
+  const [saving, setSaving] = useState(false);
   const saleIdRef = useRef<string | null>(null);
   const countdownGuard = useRef(createCountdownGuard()).current;
 
@@ -59,6 +63,7 @@ export function useSaveFlow({
     // here; without this guard the same cart is submitted twice.
     if (savingRef.current) return;
     savingRef.current = true;
+    setSaving(true);
 
     // One stable id per cart. Reused across retries so the server can apply the
     // sale exactly once no matter how many attempts reach it.
@@ -142,6 +147,7 @@ export function useSaveFlow({
     } finally {
       setLoading(false);
       savingRef.current = false;
+      setSaving(false);
     }
   }, [employee, cardNumber, pendingTotal, scannedProducts, setLoading, router]);
 
@@ -240,5 +246,5 @@ export function useSaveFlow({
     };
   }, [scannedProducts, saveOpen, resetOpen, unknownOpen, editProduct, historyOpen]);
 
-  return { saveOpen, countdown, handleSave, cancelSave, closeSaveCountdown, doSave };
+  return { saveOpen, saving, countdown, handleSave, cancelSave, closeSaveCountdown, doSave };
 }

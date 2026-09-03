@@ -48,6 +48,10 @@ export function useCashSaveFlow({
   const doSaveRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const handleSaveRef = useRef<() => void>(() => {});
   const savingRef = useRef(false);
+  // Mirrored into state so the page can stop taking scans while the sale is in
+  // flight. The payload is serialised once, up front: anything scanned after
+  // that would be carried off by the redirect without ever being billed.
+  const [saving, setSaving] = useState(false);
   const saleIdRef = useRef<string | null>(null);
   const countdownGuard = useRef(createCountdownGuard()).current;
 
@@ -61,6 +65,7 @@ export function useCashSaveFlow({
     // without this guard the same cart is submitted — and logged — twice.
     if (savingRef.current) return;
     savingRef.current = true;
+    setSaving(true);
 
     // One stable id per cart, reused across retries so the server applies the
     // sale exactly once however many attempts reach it.
@@ -157,6 +162,7 @@ export function useCashSaveFlow({
       // A stuck flag would silently block every later save on this kiosk.
       setLoading(false);
       savingRef.current = false;
+      setSaving(false);
     }
   }, [pendingTotal, scannedProducts, setScannedProducts, setPendingTotal, setLoading, router]);
 
@@ -256,5 +262,5 @@ export function useCashSaveFlow({
     };
   }, [scannedProducts, saveOpen, unknownOpen, editProduct]);
 
-  return { saveOpen, countdown, handleSave, cancelSave, closeSaveCountdown, doSave };
+  return { saveOpen, saving, countdown, handleSave, cancelSave, closeSaveCountdown, doSave };
 }
