@@ -4,6 +4,13 @@ import { addUnit } from '../cart-lines';
 import { logAction } from '@/lib/client/action-log.client';
 import { useBarcodeScanner } from '@/lib/client/useBarcodeScanner';
 
+/**
+ * A lookup must not be allowed to hang forever. The auto-logout is paused while
+ * one is in flight, so a request that never settles would keep an employee's
+ * tab on screen on a shared kiosk indefinitely.
+ */
+const LOOKUP_TIMEOUT_MS = 10000;
+
 export function useCart(
   setUnknownOpen: (open: boolean) => void,
   {
@@ -63,7 +70,8 @@ export function useCart(
 
       try {
         const res = await fetch(
-          `/api/products/lookup?barcode=${encodeURIComponent(value)}`
+          `/api/products/lookup?barcode=${encodeURIComponent(value)}`,
+          { signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS) }
         );
         const data = await res.json();
         const durationMs = Date.now() - startedAt;
@@ -97,10 +105,11 @@ export function useCart(
         });
 
         showFeedback(`${product.name} — ${product.price.toFixed(2)}$`);
-      } catch {
+      } catch (error) {
+        const timedOut = error instanceof Error && error.name === 'TimeoutError';
         logAction('scan', {
           barcode: value,
-          error: 'lookup_failed',
+          error: timedOut ? 'lookup_timeout' : 'lookup_failed',
           durationMs: Date.now() - startedAt,
         });
         showFeedback('Erreur de connexion');

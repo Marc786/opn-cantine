@@ -106,6 +106,7 @@ export default function TabPage({
     unknownOpen,
     editProduct,
     historyOpen,
+    scanPending: cart.scanPending,
   });
 
   const modalOpen =

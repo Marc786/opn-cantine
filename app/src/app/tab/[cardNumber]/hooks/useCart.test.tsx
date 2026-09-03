@@ -191,6 +191,25 @@ describe('useCart while a barcode is being looked up', () => {
 
     expect(cart().scanPending).toBe(false);
   });
+
+  it('bounds the lookup so it cannot stay pending forever', async () => {
+    // Auto-logout is paused while a lookup is in flight, so a request that
+    // never settles would keep an employee's tab on a shared screen for good.
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        found: true,
+        product: { id: 'p1', name: 'Chips', price: 2.5 },
+      }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const cart = mountCart();
+
+    await act(async () => { scan(cart); });
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit | undefined;
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
 });
 
 describe('useCart scan feedback', () => {

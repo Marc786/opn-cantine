@@ -28,6 +28,8 @@ interface Params {
   router: { push: (url: string) => void };
   unknownOpen: boolean;
   editProduct: ScannedProduct | null;
+  /** True while a barcode lookup is in flight. */
+  scanPending: boolean;
 }
 
 export function useCashSaveFlow({
@@ -39,6 +41,7 @@ export function useCashSaveFlow({
   router,
   unknownOpen,
   editProduct,
+  scanPending,
 }: Params) {
   const [saveOpen, setSaveOpen] = useState(false);
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
@@ -239,11 +242,16 @@ export function useCashSaveFlow({
     }
   }, [countdown, saveOpen, closeSaveCountdown]);
 
-  // Auto-confirm after 15 s of no new scan; paused while any modal is open
+  // Auto-confirm after 15 s of no new scan; paused while any modal is open and
+  // while a lookup is in flight. A scan in flight means the operator is still
+  // there and an item is still on its way into the cart: confirming now would
+  // serialise the payload without it, and the article would leave the shelf
+  // unbilled.
   useEffect(() => {
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
 
     if (saveOpen || unknownOpen || editProduct) return;
+    if (scanPending) return;
 
     inactivityTimerRef.current = setTimeout(() => {
       logAction('auto_logout', {
@@ -260,7 +268,7 @@ export function useCashSaveFlow({
         inactivityTimerRef.current = null;
       }
     };
-  }, [scannedProducts, saveOpen, unknownOpen, editProduct]);
+  }, [scannedProducts, saveOpen, unknownOpen, editProduct, scanPending]);
 
   return { saveOpen, saving, countdown, handleSave, cancelSave, closeSaveCountdown, doSave };
 }
