@@ -17,12 +17,15 @@ import {
   ProgressTrack,
   ProgressRange,
 } from '@chakra-ui/react';
+import { ScannedItemList } from '@/components/ScannedItemList';
+import type { ScannedProduct } from '../types';
 
 interface SaveModalProps {
   open: boolean;
   countdown: number;
   pendingTotal: number;
   projectedTab: number;
+  scannedProducts: ScannedProduct[];
   onCancel: () => void;
   onSave: () => void;
 }
@@ -32,6 +35,7 @@ export function SaveModal({
   countdown,
   pendingTotal,
   projectedTab,
+  scannedProducts,
   onCancel,
   onSave,
 }: SaveModalProps) {
@@ -52,6 +56,12 @@ export function SaveModal({
           </DialogHeader>
           <DialogBody py={6}>
             <VStack gap={5} w="full">
+              {/* What is about to be charged, in full: the totals below say
+                  how much, not what for. */}
+              {scannedProducts.length > 0 && (
+                <ScannedItemList items={scannedProducts} maxH="40vh" />
+              )}
+
               <VStack gap={1} w="full">
                 <HStack w="full" justify="space-between">
                   <Text fontSize="lg" color="fg.muted">

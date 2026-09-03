@@ -17,12 +17,15 @@ import {
   ProgressTrack,
   ProgressRange,
 } from '@chakra-ui/react';
+import { ScannedItemList } from '@/components/ScannedItemList';
+import type { ScannedProduct } from '@/app/tab/[cardNumber]/types';
 import { COUNTDOWN_SECONDS } from '../hooks/useCashSaveFlow';
 
 interface CashConfirmModalProps {
   open: boolean;
   countdown: number;
   pendingTotal: number;
+  scannedProducts: ScannedProduct[];
   onCancel: () => void;
   onConfirm: () => void;
 }
@@ -31,6 +34,7 @@ export function CashConfirmModal({
   open,
   countdown,
   pendingTotal,
+  scannedProducts,
   onCancel,
   onConfirm,
 }: CashConfirmModalProps) {
@@ -51,6 +55,12 @@ export function CashConfirmModal({
           </DialogHeader>
           <DialogBody py={6}>
             <VStack gap={5} w="full">
+              {/* Cash is counted by hand against this list, so it has to show
+                  what was scanned, not just the amount. */}
+              {scannedProducts.length > 0 && (
+                <ScannedItemList items={scannedProducts} maxH="40vh" />
+              )}
+
               <HStack w="full" justify="space-between">
                 <Text fontSize="lg" color="fg.muted">
                   Total à payer

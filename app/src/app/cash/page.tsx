@@ -6,10 +6,8 @@ import {
   Box,
   Heading,
   Button,
-  VStack,
   Text,
   Input,
-  HStack,
   Flex,
   Separator,
 } from '@chakra-ui/react';
@@ -18,6 +16,7 @@ import {
   logAction,
   logActionOnce,
 } from '@/lib/client/action-log.client';
+import { ScannedItemList } from '@/components/ScannedItemList';
 import { useCart } from '../tab/[cardNumber]/hooks/useCart';
 import { useCashSaveFlow } from './hooks/useCashSaveFlow';
 import { CashConfirmModal } from './components/CashConfirmModal';
@@ -106,7 +105,7 @@ export default function CashPage() {
         />
 
         {/* Fixed height container for scan feedback and products list */}
-        <Box minH="120px" w="full" position="relative" zIndex={10}>
+        <Box minH="180px" w="full" position="relative" zIndex={10}>
           {/* Scan feedback */}
           <Box
             position="absolute"
@@ -129,12 +128,8 @@ export default function CashPage() {
           </Box>
 
           {/* Scanned products list */}
-          <VStack
+          <Box
             w="full"
-            maxH="120px"
-            overflowY="auto"
-            gap={1}
-            align="stretch"
             opacity={hasItems && !cart.scanFeedback ? 1 : 0}
             visibility={hasItems && !cart.scanFeedback ? 'visible' : 'hidden'}
             transition="all 0.2s"
@@ -143,66 +138,16 @@ export default function CashPage() {
             left={0}
             right={0}
             zIndex={1}
-            css={{
-              '&::-webkit-scrollbar': { width: '4px' },
-              '&::-webkit-scrollbar-track': { background: 'transparent' },
-              '&::-webkit-scrollbar-thumb': {
-                background: 'var(--chakra-colors-border)',
-                borderRadius: '4px',
-              },
-            }}
           >
-            {hasItems && (
-              <Text fontSize="xs" color="fg.muted" textAlign="center" pb={0.5}>
-                Touchez un article pour le modifier
-              </Text>
-            )}
-            {cart.scannedProducts.map((p) => (
-              <Flex
-                key={p.lineId}
-                w="full"
-                py={2}
-                px={4}
-                align="center"
-                justify="space-between"
-                borderRadius="lg"
-                borderWidth="1px"
-                borderColor="border"
-                bg="bg.subtle"
-                cursor="pointer"
-                transition="all 0.15s"
-                _hover={{ bg: 'bg.muted' }}
-                _active={{ bg: 'bg.muted', transform: 'scale(0.98)' }}
-                onClick={() => {
-                  setEditProduct(p);
-                  setEditQty(p.qty);
-                }}
-              >
-                <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight="700">
-                  {p.name} {p.qty > 1 ? `x${p.qty}` : ''}
-                </Text>
-                <HStack gap={2}>
-                  <Text fontSize={{ base: 'sm', md: 'md' }} fontWeight="700">
-                    {(p.price * p.qty).toFixed(2)}$
-                  </Text>
-                  <Flex
-                    align="center"
-                    gap={1}
-                    px={2}
-                    py={0.5}
-                    borderRadius="full"
-                    bg="bg.muted"
-                    color="fg.muted"
-                    fontSize="xs"
-                    fontWeight="600"
-                    flexShrink={0}
-                  >
-                    ✎ Modifier
-                  </Flex>
-                </HStack>
-              </Flex>
-            ))}
-          </VStack>
+            <ScannedItemList
+              items={cart.scannedProducts}
+              maxH="180px"
+              onEdit={(item) => {
+                setEditProduct(item);
+                setEditQty(item.qty);
+              }}
+            />
+          </Box>
         </Box>
 
         {/* Main content */}
@@ -277,6 +222,7 @@ export default function CashPage() {
         open={save.saveOpen}
         countdown={save.countdown}
         pendingTotal={cart.pendingTotal}
+        scannedProducts={cart.scannedProducts}
         onCancel={save.cancelSave}
         onConfirm={() => {
           save.closeSaveCountdown();
