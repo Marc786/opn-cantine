@@ -18,6 +18,22 @@ export function isInventoryTracked(barcode: string): boolean {
 }
 
 /**
+ * Manual inventory corrections may start from a negative quantity. Keep the
+ * edit itself as text so the operator can erase "-5" before entering its
+ * replacement; validate the completed value before it is persisted.
+ */
+export function parseInventoryQuantity(value: string): number | null {
+  if (value.trim() === '') return null;
+
+  const quantity = Number(value);
+  return isValidInventoryQuantity(quantity) ? quantity : null;
+}
+
+export function isValidInventoryQuantity(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+/**
  * How many recent sale ids are retained per employee and per product to make
  * writes idempotent. Retry windows are seconds wide, so this is far more
  * history than is needed while keeping documents bounded.
