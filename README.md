@@ -143,6 +143,10 @@ Two rules keep inventory and transactions in sync:
 - Stock is **not** clamped at zero. Selling more units than the count claims
   leaves a negative quantity, which surfaces as a `warnings` entry and a restock
   to do, instead of silently absorbing the difference.
+- In **Admin → Produits**, a negative quantity can be selected, erased, and
+  replaced with the physical count. The completed correction must be a
+  non-negative whole number; an in-progress empty field is kept while typing
+  so `-5` can actually be replaced.
 
 ### Price check
 

@@ -20,6 +20,7 @@ import {
   DialogTitle,
   Separator,
 } from '@chakra-ui/react';
+import { parseInventoryQuantity } from '@/lib/domain/inventory-rules';
 
 interface Product {
   id: string;
@@ -60,7 +61,9 @@ export default function AdminProductsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
 
   // Inline quantity edits
-  const [quantityEdits, setQuantityEdits] = useState<Record<string, number>>({});
+  // Keep drafts as text. A controlled number input otherwise refuses the
+  // transient empty state needed to replace a negative quantity such as "-5".
+  const [quantityEdits, setQuantityEdits] = useState<Record<string, string>>({});
   const [priceEdits, setPriceEdits] = useState<Record<string, number>>({});
   const [nameEdits, setNameEdits] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -187,7 +190,7 @@ export default function AdminProductsPage() {
   };
 
   // Inline quantity change
-  const handleQuantityChange = (productId: string, newQty: number) => {
+  const handleQuantityChange = (productId: string, newQty: string) => {
     setQuantityEdits((prev) => ({ ...prev, [productId]: newQty }));
   };
 
@@ -209,6 +212,14 @@ export default function AdminProductsPage() {
   const handleBulkSave = async () => {
     if (!hasEdits) return;
 
+    const invalidQuantity = Object.values(quantityEdits).some(
+      (quantity) => parseInventoryQuantity(quantity) === null
+    );
+    if (invalidQuantity) {
+      setFeedback('La quantité doit être un nombre entier supérieur ou égal à 0.');
+      return;
+    }
+
     setSaving(true);
 
     // Collect all edited product IDs
@@ -220,7 +231,11 @@ export default function AdminProductsPage() {
 
     const promises = Array.from(editedIds).map((id) => {
       const updates: Record<string, unknown> = {};
-      if (quantityEdits[id] !== undefined) updates.quantity = quantityEdits[id];
+      if (quantityEdits[id] !== undefined) {
+        // The full edit set was checked above. Convert the display draft into
+        // the numeric value expected by the API.
+        updates.quantity = Number(quantityEdits[id]);
+      }
       if (priceEdits[id] !== undefined) updates.price = priceEdits[id];
       if (nameEdits[id] !== undefined) updates.name = nameEdits[id];
       return fetch(`/api/products/${id}`, {
@@ -407,6 +422,7 @@ export default function AdminProductsPage() {
             const editedQty = quantityEdits[product.id];
             const currentQty =
               editedQty !== undefined ? editedQty : product.quantity;
+            const quantityForDisplay = Number(currentQty);
 
             return (
               <Flex
@@ -468,7 +484,7 @@ export default function AdminProductsPage() {
                   />
                 </Flex>
                 <Flex flex={1} justify="end" align="center" gap={2}>
-                  {currentQty < 0 && (
+                  {quantityForDisplay < 0 && (
                     <Text
                       fontSize="xs"
                       fontWeight="700"
@@ -482,19 +498,16 @@ export default function AdminProductsPage() {
                     type="number"
                     value={currentQty}
                     onChange={(e) => {
-                      const val = parseInt(e.target.value);
-                      if (!isNaN(val) && val >= 0) {
-                        handleQuantityChange(product.id, val);
-                      }
+                      handleQuantityChange(product.id, e.target.value);
                     }}
                     w="80px"
                     textAlign="center"
                     fontWeight="600"
                     fontSize={{ base: 'md', md: 'lg' }}
                     color={
-                      currentQty <= 0
+                      quantityForDisplay <= 0
                         ? 'red.500'
-                        : currentQty < 5
+                        : quantityForDisplay < 5
                           ? 'yellow.500'
                           : undefined
                     }

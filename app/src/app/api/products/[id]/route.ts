@@ -5,6 +5,7 @@ import {
   verifyAdminRequest,
   unauthorizedResponse,
 } from '@/lib/infrastructure/auth/admin-token';
+import { isValidInventoryQuantity } from '@/lib/domain/inventory-rules';
 
 const service = new ProductApplicationService(productRepository);
 
@@ -17,6 +18,13 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
   const { name, price, quantity, barcodes } = body;
+
+  if (quantity !== undefined && !isValidInventoryQuantity(quantity)) {
+    return NextResponse.json(
+      { error: 'Quantity must be a non-negative integer' },
+      { status: 400 }
+    );
+  }
 
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;

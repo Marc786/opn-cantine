@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   isInventoryTracked,
   isValidSaleId,
+  isValidInventoryQuantity,
+  parseInventoryQuantity,
 } from '@/lib/domain/inventory-rules';
 
 describe('isInventoryTracked', () => {
@@ -37,5 +39,32 @@ describe('isValidSaleId', () => {
 
   it('rejects an over-long id', () => {
     expect(isValidSaleId('a'.repeat(65))).toBe(false);
+  });
+});
+
+describe('parseInventoryQuantity', () => {
+  it.each([
+    ['0', 0],
+    ['12', 12],
+    [' 7 ', 7],
+  ])('accepts a completed non-negative integer %j', (value, expected) => {
+    expect(parseInventoryQuantity(value)).toBe(expected);
+  });
+
+  it.each(['', ' ', '-5', '1.5', 'abc'])(
+    'rejects incomplete or invalid inventory correction %j',
+    (value) => {
+      expect(parseInventoryQuantity(value)).toBeNull();
+    }
+  );
+});
+
+describe('isValidInventoryQuantity', () => {
+  it.each([0, 12])('accepts %i', (quantity) => {
+    expect(isValidInventoryQuantity(quantity)).toBe(true);
+  });
+
+  it.each([-1, 1.5, NaN, '4', null])('rejects %j', (quantity) => {
+    expect(isValidInventoryQuantity(quantity)).toBe(false);
   });
 });
